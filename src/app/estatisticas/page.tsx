@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PriceChart } from '@/components/predictions/price-chart';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select } from '@/components/ui/select';
-import { BarChart3, TrendingUp, TrendingDown, Minus, Database, Calendar, ExternalLink } from 'lucide-react';
-import { supabase, getDailyAverages } from '@/lib/supabase';
+import { TrendingUp, TrendingDown, Minus, Database, ExternalLink } from 'lucide-react';
+import { getDailyAverages } from '@/lib/supabase';
 import { getFuelShortName, getFuelColor } from '@/lib/utils';
 
 interface DailyAvg {
@@ -24,36 +23,29 @@ const FUEL_OPTIONS = [
   'GPL Auto',
 ];
 
+async function fetchFuelData(selectedFuels: string[], timeRange: number): Promise<DailyAvg[]> {
+  const results = await Promise.all(
+    selectedFuels.map((fuel) => getDailyAverages(fuel, timeRange))
+  );
+  return results.flat().filter(Boolean) as DailyAvg[];
+}
+
 export default function EstatisticasPage() {
-  const [data, setData] = useState<DailyAvg[]>([]);
-  const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(90);
   const [selectedFuels, setSelectedFuels] = useState<string[]>([
     'Gasóleo simples',
     'Gasolina simples 95',
   ]);
-  const [hasData, setHasData] = useState(false);
 
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      try {
-        const allData: DailyAvg[] = [];
-        for (const fuel of selectedFuels) {
-          const fuelData = await getDailyAverages(fuel, timeRange);
-          if (fuelData) allData.push(...fuelData);
-        }
-        setData(allData);
-        setHasData(allData.length > 0);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setHasData(false);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [timeRange, selectedFuels]);
+  const {
+    data = [],
+    isLoading: loading,
+  } = useQuery({
+    queryKey: ['fuelHistory', selectedFuels, timeRange],
+    queryFn: () => fetchFuelData(selectedFuels, timeRange),
+  });
+
+  const hasData = data.length > 0;
 
   const chartData = (() => {
     const dateMap = new Map<string, { date: string; [key: string]: string | number | undefined }>();

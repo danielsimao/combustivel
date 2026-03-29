@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Station, Brand } from '@/types';
 import { StationMap } from '@/components/map/station-map';
 import { StationCard } from '@/components/stations/station-card';
@@ -24,9 +25,35 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+async function fetchBrands(): Promise<Brand[]> {
+  const r = await fetch('/api/dgeg/marcas');
+  const data = await r.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function fetchStations(params: {
+  selectedFuel: string;
+  selectedDistrict: string;
+  selectedBrand: string;
+}): Promise<Station[]> {
+  const searchParams = new URLSearchParams();
+  if (params.selectedFuel) searchParams.set('idsTiposComb', params.selectedFuel);
+  if (params.selectedDistrict) searchParams.set('idDistrito', params.selectedDistrict);
+  if (params.selectedBrand) searchParams.set('idMarca', params.selectedBrand);
+  searchParams.set('qtdPorPagina', '100');
+  searchParams.set('pagina', '1');
+
+  const res = await fetch(`/api/dgeg/pesquisar?${searchParams.toString()}`);
+  const data = await res.json();
+
+  if (data.erro) {
+    throw new Error(data.erro);
+  }
+
+  return data.resultado || data || [];
+}
+
 export default function HomePage() {
-  const [stations, setStations] = useState<Station[]>([]);
-  const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
@@ -35,73 +62,55 @@ export default function HomePage() {
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedFuel, setSelectedFuel] = useState('3201');
   const [selectedBrand, setSelectedBrand] = useState('');
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchTrigger, setSearchTrigger] = useState(0);
+  const [locationError, setLocationError] = useState('');
 
-  useEffect(() => {
-    fetch('/api/dgeg/marcas')
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setBrands(data);
-      })
-      .catch(console.error);
-  }, []);
+  const { data: brands = [] } = useQuery({
+    queryKey: ['brands'],
+    queryFn: fetchBrands,
+  });
 
-  const searchStations = useCallback(async () => {
-    setLoading(true);
-    setError('');
+  const {
+    data: rawStations = [],
+    isLoading: loading,
+    error: searchError,
+  } = useQuery({
+    queryKey: ['stations', selectedFuel, selectedDistrict, selectedBrand, searchTrigger],
+    queryFn: () => fetchStations({ selectedFuel, selectedDistrict, selectedBrand }),
+    enabled: hasSearched,
+  });
+
+  const stations = useMemo(() => {
+    if (!userLocation || rawStations.length === 0) return rawStations;
+    return [...rawStations]
+      .map((s) => ({
+        ...s,
+        _distance: calculateDistance(
+          userLocation.lat,
+          userLocation.lng,
+          s.Latitude,
+          s.Longitude
+        ),
+      }))
+      .sort(
+        (a: Station & { _distance: number }, b: Station & { _distance: number }) =>
+          a._distance - b._distance
+      )
+      .slice(0, 50);
+  }, [rawStations, userLocation]);
+
+  const error = searchError?.message || locationError;
+
+  const searchStations = useCallback(() => {
+    setLocationError('');
     setHasSearched(true);
-
-    try {
-      const params = new URLSearchParams();
-      if (selectedFuel) params.set('idsTiposComb', selectedFuel);
-      if (selectedDistrict) params.set('idDistrito', selectedDistrict);
-      if (selectedBrand) params.set('idMarca', selectedBrand);
-      params.set('qtdPorPagina', '100');
-      params.set('pagina', '1');
-
-      const res = await fetch(`/api/dgeg/pesquisar?${params.toString()}`);
-      const data = await res.json();
-
-      if (data.erro) {
-        setError(data.erro);
-        setStations([]);
-        return;
-      }
-
-      let results = data.resultado || data || [];
-
-      if (userLocation && results.length > 0) {
-        results = results
-          .map((s: Station) => ({
-            ...s,
-            _distance: calculateDistance(
-              userLocation.lat,
-              userLocation.lng,
-              s.Latitude,
-              s.Longitude
-            ),
-          }))
-          .sort(
-            (a: Station & { _distance: number }, b: Station & { _distance: number }) =>
-              a._distance - b._distance
-          )
-          .slice(0, 50);
-      }
-
-      setStations(results);
-    } catch (err) {
-      console.error(err);
-      setError('Erro ao pesquisar postos. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedFuel, selectedDistrict, selectedBrand, userLocation]);
+    setSearchTrigger((t) => t + 1);
+  }, []);
 
   const locateMe = useCallback(() => {
     if (!navigator.geolocation) {
-      setError('Geolocalização não suportada pelo seu navegador.');
+      setLocationError('Geolocalização não suportada pelo seu navegador.');
       return;
     }
 
@@ -114,10 +123,12 @@ export default function HomePage() {
         });
         setIsLocating(false);
         setSelectedDistrict('');
+        setLocationError('');
+        setHasSearched(true);
+        setSearchTrigger((t) => t + 1);
       },
-      (err) => {
-        console.error(err);
-        setError(
+      () => {
+        setLocationError(
           'Não foi possível obter a sua localização. Verifique as permissões.'
         );
         setIsLocating(false);
@@ -126,25 +137,21 @@ export default function HomePage() {
     );
   }, []);
 
-  useEffect(() => {
-    if (userLocation) {
-      searchStations();
-    }
-  }, [userLocation, searchStations]);
+  const sortedByPrice = useMemo(() => {
+    return [...stations]
+      .map((s) => {
+        const fuel = s.Combustiveis?.find(
+          (c) => c.TipoCombustivel === FUEL_TYPES[Number(selectedFuel)]
+        );
+        return { ...s, _price: fuel ? parsePrice(fuel.Preco) : Infinity };
+      })
+      .filter((s) => s._price < Infinity)
+      .sort((a, b) => a._price - b._price);
+  }, [stations, selectedFuel]);
 
-  const sortedByPrice = [...stations]
-    .map((s) => {
-      const fuel = s.Combustiveis?.find(
-        (c) => c.TipoCombustivel === FUEL_TYPES[Number(selectedFuel)]
-      );
-      return { ...s, _price: fuel ? parsePrice(fuel.Preco) : Infinity };
-    })
-    .filter((s) => s._price < Infinity)
-    .sort((a, b) => a._price - b._price);
-
-  const handleStationClick = (station: Station) => {
+  const handleStationClick = useCallback((station: Station) => {
     window.location.href = `/posto/${station.Id}`;
-  };
+  }, []);
 
   const fuelTypeName = FUEL_TYPES[Number(selectedFuel)] || 'Gasóleo simples';
 

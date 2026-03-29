@@ -1,22 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PriceForecast } from '@/components/predictions/price-forecast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
   Calendar,
   ExternalLink,
   Lightbulb,
   BarChart3,
   AlertTriangle,
-  RefreshCw,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { FuelPrediction } from '@/lib/scrape-predictions';
 
 interface PredictionInfo {
@@ -29,6 +23,13 @@ interface PredictionInfo {
   recommendation: string;
   source: string;
   factors: string[];
+}
+
+interface PredictionData {
+  predictions: FuelPrediction[];
+  scrapedAt: string;
+  source: string;
+  error?: string;
 }
 
 function getRecommendation(trend: string, fuelLabel: string): string {
@@ -59,50 +60,48 @@ function getFactors(trend: string): string[] {
   return ['Mercado estável', 'Sem variação significativa nas cotações internacionais'];
 }
 
+async function fetchAvgPrices(): Promise<Record<string, number>> {
+  const r = await fetch('/api/dgeg/preco-medio');
+  const data = await r.json();
+  const prices: Record<string, number> = {};
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      if (item.TipoCombustivel && item.PrecoMedio) {
+        prices[item.TipoCombustivel] = parseFloat(
+          String(item.PrecoMedio).replace(',', '.')
+        );
+      }
+    }
+  }
+  return prices;
+}
+
+async function fetchPredictions(): Promise<PredictionData> {
+  const r = await fetch('/api/previsao');
+  return r.json();
+}
+
 export default function PrevisaoPage() {
-  const [loading, setLoading] = useState(true);
-  const [avgPrices, setAvgPrices] = useState<Record<string, number>>({});
-  const [scrapedPredictions, setScrapedPredictions] = useState<FuelPrediction[]>([]);
-  const [scrapeError, setScrapeError] = useState('');
-  const [scrapedAt, setScrapedAt] = useState('');
-  const [scrapeSource, setScrapeSource] = useState('');
+  const {
+    data: avgPrices = {},
+    isLoading: pricesLoading,
+  } = useQuery({
+    queryKey: ['avgPrices'],
+    queryFn: fetchAvgPrices,
+  });
 
-  useEffect(() => {
-    // Fetch both in parallel
-    Promise.all([
-      fetch('/api/dgeg/preco-medio')
-        .then((r) => r.json())
-        .catch(() => []),
-      fetch('/api/previsao')
-        .then((r) => r.json())
-        .catch(() => ({ predictions: [], error: 'Erro de rede' })),
-    ])
-      .then(([priceData, predData]) => {
-        // Process average prices
-        if (Array.isArray(priceData)) {
-          const prices: Record<string, number> = {};
-          for (const item of priceData) {
-            if (item.TipoCombustivel && item.PrecoMedio) {
-              prices[item.TipoCombustivel] = parseFloat(
-                String(item.PrecoMedio).replace(',', '.')
-              );
-            }
-          }
-          setAvgPrices(prices);
-        }
+  const {
+    data: predData,
+    isLoading: predLoading,
+  } = useQuery({
+    queryKey: ['predictions'],
+    queryFn: fetchPredictions,
+  });
 
-        // Process scraped predictions
-        if (predData.predictions && predData.predictions.length > 0) {
-          setScrapedPredictions(predData.predictions);
-          setScrapedAt(predData.scrapedAt || '');
-          setScrapeSource(predData.source || '');
-        }
-        if (predData.error) {
-          setScrapeError(predData.error);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  const loading = pricesLoading || predLoading;
+  const scrapedPredictions = predData?.predictions ?? [];
+  const scrapeError = predData?.error ?? '';
+  const scrapedAt = predData?.scrapedAt ?? '';
 
   // Build predictions from scraped data
   const predictions: PredictionInfo[] = scrapedPredictions.map((sp) => ({
@@ -119,7 +118,6 @@ export default function PrevisaoPage() {
     factors: getFactors(sp.trend),
   }));
 
-  // If scraping returned no data, show fallback with DGEG prices only
   const hasPredictions = predictions.length > 0;
 
   const lastUpdated = scrapedAt

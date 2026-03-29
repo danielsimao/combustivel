@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { Station } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +13,6 @@ import {
   MapPin,
   Clock,
   Navigation,
-  Phone,
   Fuel,
   ArrowLeft,
   ExternalLink,
@@ -21,30 +21,29 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+async function fetchStation(id: string): Promise<Station> {
+  const r = await fetch(`/api/dgeg/posto?id=${id}`);
+  const data = await r.json();
+  if (data.resultado) return data.resultado;
+  if (data.Id) return data;
+  throw new Error('Posto não encontrado.');
+}
+
 export default function StationDetailPage() {
   const params = useParams();
-  const [station, setStation] = useState<Station | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const stationId = params.id as string;
 
-  useEffect(() => {
-    if (!params.id) return;
-
-    fetch(`/api/dgeg/posto?id=${params.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.resultado) {
-          setStation(data.resultado);
-        } else if (data.Id) {
-          setStation(data);
-        } else {
-          setError('Posto não encontrado.');
-        }
-      })
-      .catch(() => setError('Erro ao carregar dados do posto.'))
-      .finally(() => setLoading(false));
-  }, [params.id]);
+  const {
+    data: station,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['station', stationId],
+    queryFn: () => fetchStation(stationId),
+    enabled: !!stationId,
+    retry: false,
+  });
 
   const copyAddress = () => {
     if (station?.Morada) {
@@ -63,7 +62,7 @@ export default function StationDetailPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
         <Skeleton className="mb-4 h-8 w-48" />
@@ -80,7 +79,9 @@ export default function StationDetailPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center sm:px-6">
         <Fuel className="mx-auto mb-4 h-12 w-12 text-zinc-300" />
-        <h2 className="text-lg font-semibold text-zinc-700">{error || 'Posto não encontrado'}</h2>
+        <h2 className="text-lg font-semibold text-zinc-700">
+          {error instanceof Error ? error.message : 'Posto não encontrado'}
+        </h2>
         <Link href="/" className="mt-4 inline-block text-sm text-blue-600 hover:underline">
           Voltar à pesquisa
         </Link>
