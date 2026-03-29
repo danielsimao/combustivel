@@ -1,9 +1,9 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
-import { SelectHTMLAttributes, forwardRef } from "react";
 
-export const Select = forwardRef<
+const Select = React.forwardRef<
   HTMLSelectElement,
-  SelectHTMLAttributes<HTMLSelectElement>
+  React.SelectHTMLAttributes<HTMLSelectElement>
 >(({ className, ...props }, ref) => (
   <select
     ref={ref}
@@ -15,3 +15,5 @@ export const Select = forwardRef<
   />
 ));
 Select.displayName = "Select";
+
+export { Select };

@@ -3,8 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Fuel, Map, TrendingUp, BarChart3, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { Fuel, Map, TrendingUp, BarChart3, Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer';
 
 const navigation = [
   { name: 'Mapa', href: '/', icon: Map },
@@ -15,7 +23,6 @@ const navigation = [
 
 export function Header() {
   const pathname = usePathname();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-lg dark:border-zinc-800 dark:bg-zinc-950/80">
@@ -34,6 +41,7 @@ export function Header() {
           </div>
         </Link>
 
+        {/* Desktop nav */}
         <nav className="hidden items-center gap-1 md:flex">
           {navigation.map((item) => {
             const isActive = pathname === item.href;
@@ -55,37 +63,46 @@ export function Header() {
           })}
         </nav>
 
-        <button
-          className="rounded-lg p-2 text-zinc-600 hover:bg-zinc-100 md:hidden dark:text-zinc-400"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        {/* Mobile drawer */}
+        <Drawer>
+          <DrawerTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              aria-label="Abrir menu de navegação"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>Navegação</DrawerTitle>
+            </DrawerHeader>
+            <nav className="flex flex-col gap-1 px-4 pb-8">
+              {navigation.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <DrawerClose key={item.href} asChild>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                          : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                      )}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      {item.name}
+                    </Link>
+                  </DrawerClose>
+                );
+              })}
+            </nav>
+          </DrawerContent>
+        </Drawer>
       </div>
-
-      {mobileMenuOpen && (
-        <div className="border-t border-zinc-200 bg-white px-4 py-3 md:hidden dark:border-zinc-800 dark:bg-zinc-950">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400'
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.name}
-              </Link>
-            );
-          })}
-        </div>
-      )}
     </header>
   );
 }
