@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { Station } from '@/types';
-import { formatPrice, parsePrice, getFuelShortName } from '@/lib/utils';
 
 interface StationMapProps {
   stations: Station[];
@@ -20,8 +19,8 @@ export function StationMap({
   const [MapComponent, setMapComponent] = useState<React.ComponentType<StationMapProps> | null>(null);
 
   useEffect(() => {
-    import('./leaflet-map').then((mod) => {
-      setMapComponent(() => mod.LeafletMap);
+    import('./maplibre-map').then((mod) => {
+      setMapComponent(() => mod.MaplibreMap);
     });
   }, []);
 
@@ -43,13 +42,5 @@ export function StationMap({
       selectedFuel={selectedFuel}
       onStationClick={onStationClick}
     />
-  );
-}
-
-export function StationMapFallback() {
-  return (
-    <div className="flex h-[500px] items-center justify-center rounded-xl bg-zinc-100 dark:bg-zinc-900">
-      <p className="text-sm text-zinc-500">Mapa indisponível</p>
-    </div>
   );
 }
