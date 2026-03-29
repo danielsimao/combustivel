@@ -27,24 +27,30 @@ function detectTrend(text: string): 'sobe' | 'desce' | 'neutro' {
   return 'neutro';
 }
 
+function safeParseFloat(str: string): number {
+  const value = parseFloat(str.replace(',', '.').replace(/\s/g, ''));
+  return isNaN(value) ? 0 : value;
+}
+
 function extractVariation(text: string): number {
-  // Match patterns like "+0,015 €/l", "-0,01 €/l", "0,015€/l", "1,5 cêntimos"
+  // Match patterns like "+0,015 €/l", "-0,01 €/l", "0,015€/l"
   const euroMatch = text.match(/([+-]?\s?\d+[.,]\d+)\s?€\/?[lL]/);
   if (euroMatch) {
-    const value = parseFloat(euroMatch[1].replace(',', '.').replace(/\s/g, ''));
-    return Math.round(value * 1000) / 10; // convert to cents
+    const value = safeParseFloat(euroMatch[1]);
+    // value is in euros per liter, convert to cents (e.g. 0.015 -> 1.5 cents)
+    return Math.round(value * 100 * 10) / 10;
   }
 
   // Match "X cêntimos" or "X,Y cêntimos"
   const centMatch = text.match(/([+-]?\s?\d+[.,]?\d*)\s?c[eê]ntimos?/i);
   if (centMatch) {
-    return parseFloat(centMatch[1].replace(',', '.').replace(/\s/g, ''));
+    return safeParseFloat(centMatch[1]);
   }
 
-  // Match standalone decimal that looks like a price change
+  // Match standalone decimal that looks like a price change (e.g. "0,015€")
   const decimalMatch = text.match(/(?:cerca de |aproximadamente )?([+-]?\d+[.,]\d+)\s?€/);
   if (decimalMatch) {
-    const value = parseFloat(decimalMatch[1].replace(',', '.'));
+    const value = safeParseFloat(decimalMatch[1]);
     if (Math.abs(value) < 1) {
       return Math.round(value * 100 * 10) / 10;
     }
@@ -138,8 +144,9 @@ export async function scrapePredictions(): Promise<ScrapedPredictions> {
         .replace(/\s+/g, ' ');
 
       for (const fp of fuelPatterns) {
+        // Use bounded quantifier to prevent ReDoS
         const sectionMatch = allText.match(
-          new RegExp(`(${fp.pattern.source}[^.]*(?:sobe|desce|subir|descer|mant|estável)[^.]*\\.)`, 'i')
+          new RegExp(`(${fp.pattern.source}[^.]{0,300}(?:sobe|desce|subir|descer|mant|estável)[^.]{0,200}\\.)`, 'i')
         );
 
         if (sectionMatch) {

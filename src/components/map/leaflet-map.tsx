@@ -17,21 +17,22 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function createPriceIcon(price: string, isLowest: boolean) {
+  const bg = isLowest ? '#16a34a' : '#2563eb';
+  const border = isLowest ? '#15803d' : '#1d4ed8';
+  const safePrice = escapeHtml(price);
   return L.divIcon({
     className: 'custom-price-marker',
-    html: `<div style="
-      background: ${isLowest ? '#16a34a' : '#2563eb'};
-      color: white;
-      padding: 4px 8px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 700;
-      white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-      border: 2px solid ${isLowest ? '#15803d' : '#1d4ed8'};
-      text-align: center;
-    ">${price}</div>`,
+    html: `<div style="background:${bg};color:white;padding:4px 8px;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);border:2px solid ${border};text-align:center">${safePrice}</div>`,
     iconSize: [80, 30],
     iconAnchor: [40, 30],
   });
