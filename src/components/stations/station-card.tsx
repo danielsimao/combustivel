@@ -4,8 +4,8 @@ import { Station } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatPrice, parsePrice, getFuelShortName, calculateDistance } from '@/lib/utils';
+import { searchStore } from '@/lib/search-store';
 import { MapPin, Navigation, Clock } from 'lucide-react';
-import Link from 'next/link';
 
 interface StationCardProps {
   station: Station;
@@ -29,7 +29,7 @@ export function StationCard({ station, userLocation, selectedFuel, rank }: Stati
     : null;
 
   return (
-    <Link href={`/posto/${station.Id}`}>
+    <div onClick={() => searchStore.setState((s) => ({ ...s, selectedStation: station }))}>
       <Card className="transition-all hover:shadow-md hover:border-blue-200 cursor-pointer">
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
@@ -100,6 +100,6 @@ export function StationCard({ station, userLocation, selectedFuel, rank }: Stati
           )}
         </CardContent>
       </Card>
-    </Link>
+    </div>
   );
 }

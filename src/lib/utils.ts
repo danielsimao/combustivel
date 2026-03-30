@@ -107,13 +107,10 @@ export const DISTRICTS: Record<number, string> = {
 };
 
 export const FUEL_TYPES: Record<number, string> = {
-  3201: 'Gasóleo simples',
-  3001: 'Gasóleo especial',
-  3301: 'Gasóleo colorido',
-  2101: 'Gasolina simples 95',
-  2001: 'Gasolina especial 95',
-  2201: 'Gasolina especial 98',
-  5001: 'GPL Auto',
+  2101: 'Gasóleo simples',
+  2105: 'Gasóleo especial',
+  3201: 'Gasolina simples 95',
+  3205: 'Gasolina especial 95',
 };
 
-export const MAIN_FUEL_TYPES = [3201, 2101, 2201, 5001];
+export const MAIN_FUEL_TYPES = [2101, 3201, 2105, 3205];

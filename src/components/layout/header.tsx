@@ -3,22 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Fuel, Map, TrendingUp, BarChart3, Menu } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from '@/components/ui/drawer';
+import { Fuel, Map, TrendingUp, BarChart3 } from 'lucide-react';
 
 const navigation = [
   { name: 'Mapa', href: '/', icon: Map },
   { name: 'Previsão', href: '/previsao', icon: TrendingUp },
   { name: 'Estatísticas', href: '/estatisticas', icon: BarChart3 },
-  { name: 'Sobre', href: '/sobre', icon: Fuel },
 ];
 
 export function Header() {
@@ -62,46 +52,6 @@ export function Header() {
             );
           })}
         </nav>
-
-        {/* Mobile drawer */}
-        <Drawer>
-          <DrawerTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              aria-label="Abrir menu de navegação"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </DrawerTrigger>
-          <DrawerContent>
-            <DrawerHeader>
-              <DrawerTitle>Navegação</DrawerTitle>
-            </DrawerHeader>
-            <nav className="flex flex-col gap-1 px-4 pb-8">
-              {navigation.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <DrawerClose key={item.href} asChild>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors',
-                        isActive
-                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                          : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-                      )}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      {item.name}
-                    </Link>
-                  </DrawerClose>
-                );
-              })}
-            </nav>
-          </DrawerContent>
-        </Drawer>
       </div>
     </header>
   );

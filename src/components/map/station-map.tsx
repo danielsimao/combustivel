@@ -7,6 +7,7 @@ interface StationMapProps {
   stations: Station[];
   userLocation: { lat: number; lng: number } | null;
   selectedFuel: string;
+  selectedStationId?: number | null;
   onStationClick: (station: Station) => void;
 }
 
@@ -14,9 +15,10 @@ export function StationMap({
   stations,
   userLocation,
   selectedFuel,
+  selectedStationId,
   onStationClick,
 }: StationMapProps) {
-  const [MapComponent, setMapComponent] = useState<React.ComponentType<StationMapProps> | null>(null);
+  const [MapComponent, setMapComponent] = useState<React.ComponentType<StationMapProps & { selectedStationId: number | null }> | null>(null);
 
   useEffect(() => {
     import('./maplibre-map').then((mod) => {
@@ -40,6 +42,7 @@ export function StationMap({
       stations={stations}
       userLocation={userLocation}
       selectedFuel={selectedFuel}
+      selectedStationId={selectedStationId ?? null}
       onStationClick={onStationClick}
     />
   );

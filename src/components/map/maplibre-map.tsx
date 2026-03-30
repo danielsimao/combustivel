@@ -21,6 +21,7 @@ interface MaplibreMapProps {
   stations: Station[];
   userLocation: { lat: number; lng: number } | null;
   selectedFuel: string;
+  selectedStationId: number | null;
   onStationClick: (station: Station) => void;
 }
 
@@ -28,12 +29,12 @@ export function MaplibreMap({
   stations,
   userLocation,
   selectedFuel,
+  selectedStationId,
   onStationClick,
 }: MaplibreMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
-  const popupRef = useRef<maplibregl.Popup | null>(null);
 
   const center: [number, number] = userLocation
     ? [userLocation.lng, userLocation.lat]
@@ -79,12 +80,32 @@ export function MaplibreMap({
   // Update center when user location changes
   useEffect(() => {
     if (!map.current || !userLocation) return;
-    map.current.flyTo({
-      center: [userLocation.lng, userLocation.lat],
-      zoom: 12,
-      duration: 1000,
-    });
+    const fly = () => {
+      map.current?.flyTo({
+        center: [userLocation.lng, userLocation.lat],
+        zoom: 12,
+        duration: 1000,
+      });
+    };
+    if (map.current.isStyleLoaded()) {
+      fly();
+    } else {
+      map.current.once('load', fly);
+    }
   }, [userLocation]);
+
+  // Pan to selected station
+  useEffect(() => {
+    if (!map.current || !selectedStationId) return;
+    const selected = stationsWithPrice.find((s) => s.station.Id === selectedStationId);
+    if (!selected) return;
+    const { Longitude, Latitude } = selected.station;
+    if (!Longitude || !Latitude) return;
+    map.current.easeTo({
+      center: [Longitude, Latitude],
+      duration: 500,
+    });
+  }, [selectedStationId, stationsWithPrice]);
 
   // Render markers
   useEffect(() => {
@@ -95,9 +116,6 @@ export function MaplibreMap({
       m.remove();
     }
     markersRef.current = [];
-
-    // Close any open popup
-    popupRef.current?.remove();
 
     // Add user location marker
     if (userLocation) {
@@ -121,12 +139,18 @@ export function MaplibreMap({
     // Add station markers
     for (const { station, price } of stationsWithPrice) {
       const isLowest = Math.abs(price - lowestPrice) < 0.001;
-      const bg = isLowest ? '#16a34a' : '#2563eb';
-      const border = isLowest ? '#15803d' : '#1d4ed8';
+      const isSelected = station.Id === selectedStationId;
+      const bg = isSelected ? '#f59e0b' : isLowest ? '#16a34a' : '#2563eb';
+      const border = isSelected ? '#d97706' : isLowest ? '#15803d' : '#1d4ed8';
+      const scale = isSelected ? 'scale(1.25)' : 'scale(1)';
+      const shadow = isSelected
+        ? '0 0 0 3px rgba(245,158,11,0.4), 0 4px 12px rgba(0,0,0,0.4)'
+        : '0 2px 8px rgba(0,0,0,0.3)';
       const safePrice = escapeHtml(formatPrice(price));
 
       const el = document.createElement('div');
       el.style.cursor = 'pointer';
+      el.style.zIndex = isSelected ? '10' : '1';
       el.innerHTML = `
         <div style="
           background: ${bg};
@@ -136,69 +160,46 @@ export function MaplibreMap({
           font-size: 12px;
           font-weight: 700;
           white-space: nowrap;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          box-shadow: ${shadow};
           border: 2px solid ${border};
           text-align: center;
-          transform: translate(-50%, -100%);
+          transform: translate(-50%, -100%) ${scale};
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
         ">${safePrice}</div>
       `;
-
-      // Build popup content
-      const fuelRows = (station.Combustiveis || [])
-        .map((fuel) => {
-          const name = escapeHtml(getFuelShortName(fuel.TipoCombustivel));
-          const fuelPrice = escapeHtml(fuel.Preco || '—');
-          return `<div style="display:flex;justify-content:space-between;font-size:12px;padding:2px 0">
-            <span style="color:#6b7280">${name}</span>
-            <span style="font-weight:600">${fuelPrice}</span>
-          </div>`;
-        })
-        .join('');
-
-      const popupHtml = `
-        <div style="min-width:200px;font-family:inherit">
-          <p style="font-weight:700;color:#18181b;margin:0">${escapeHtml(station.Nome)}</p>
-          <p style="font-size:12px;color:#a1a1aa;margin:2px 0 0">${escapeHtml(station.Marca)}</p>
-          <p style="font-size:12px;color:#52525b;margin:4px 0">${escapeHtml(station.Morada || '')}</p>
-          <div style="margin-top:8px">${fuelRows}</div>
-          <a href="/posto/${station.Id}" style="display:block;text-align:center;font-size:12px;font-weight:500;color:#2563eb;margin-top:8px;text-decoration:none">
-            Ver detalhes →
-          </a>
-        </div>
-      `;
-
-      const popup = new maplibregl.Popup({
-        offset: [0, -10],
-        closeButton: true,
-        maxWidth: '280px',
-      }).setHTML(popupHtml);
 
       const marker = new maplibregl.Marker({
         element: el,
         anchor: 'bottom',
       })
         .setLngLat([station.Longitude, station.Latitude])
-        .setPopup(popup)
         .addTo(map.current);
 
       el.addEventListener('click', () => {
-        popupRef.current?.remove();
-        popup.addTo(map.current!);
-        popupRef.current = popup;
+        onStationClick(station);
       });
 
       markersRef.current.push(marker);
     }
 
-    // Fit bounds to show all markers
+    // Fit bounds to show all markers (wait for style to load)
     if (stationsWithPrice.length > 0 && !userLocation) {
-      const bounds = new maplibregl.LngLatBounds();
-      for (const { station } of stationsWithPrice) {
-        bounds.extend([station.Longitude, station.Latitude]);
+      const fitBounds = () => {
+        if (!map.current) return;
+        const bounds = new maplibregl.LngLatBounds();
+        for (const { station } of stationsWithPrice) {
+          bounds.extend([station.Longitude, station.Latitude]);
+        }
+        map.current.fitBounds(bounds, { padding: 50, maxZoom: 14 });
+      };
+
+      if (map.current.isStyleLoaded()) {
+        fitBounds();
+      } else {
+        map.current.once('load', fitBounds);
       }
-      map.current.fitBounds(bounds, { padding: 50, maxZoom: 14 });
     }
-  }, [stationsWithPrice, lowestPrice, userLocation]);
+  }, [stationsWithPrice, lowestPrice, userLocation, onStationClick, selectedStationId]);
 
   return (
     <div

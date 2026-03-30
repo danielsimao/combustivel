@@ -2,9 +2,12 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useStore } from '@tanstack/react-store';
 import { Station, Brand } from '@/types';
+import { searchStore } from '@/lib/search-store';
 import { StationMap } from '@/components/map/station-map';
 import { StationCard } from '@/components/stations/station-card';
+import { StationDrawer } from '@/components/stations/station-drawer';
 import { SearchFilters } from '@/components/stations/search-filters';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,21 +53,43 @@ async function fetchStations(params: {
     throw new Error(data.erro);
   }
 
-  return data.resultado || data || [];
+  const results = data.resultado || data || [];
+
+  // DGEG search returns flat objects with Preco/Combustivel fields.
+  // Normalize into Station shape with Combustiveis array for the map.
+  return results.map((s: Record<string, unknown>) => ({
+    ...s,
+    Combustiveis: s.Combustivel && s.Preco
+      ? [{ TipoCombustivel: s.Combustivel as string, Preco: s.Preco as string, DataAtualizacao: (s.DataAtualizacao as string) || '' }]
+      : s.Combustiveis || [],
+  }));
 }
 
 export default function HomePage() {
-  const [userLocation, setUserLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
+  // Read state from TanStack Store — persists across navigations
+  const selectedDistrict = useStore(searchStore, (s) => s.selectedDistrict);
+  const selectedFuel = useStore(searchStore, (s) => s.selectedFuel);
+  const selectedBrand = useStore(searchStore, (s) => s.selectedBrand);
+  const hasSearched = useStore(searchStore, (s) => s.hasSearched);
+  const userLocation = useStore(searchStore, (s) => s.userLocation);
+  const selectedStation = useStore(searchStore, (s) => s.selectedStation);
+
   const [isLocating, setIsLocating] = useState(false);
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [selectedFuel, setSelectedFuel] = useState('3201');
-  const [selectedBrand, setSelectedBrand] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
-  const [searchTrigger, setSearchTrigger] = useState(0);
   const [locationError, setLocationError] = useState('');
+
+  const setSelectedDistrict = useCallback(
+    (v: string) => searchStore.setState((s) => ({ ...s, selectedDistrict: v })),
+    []
+  );
+  const setSelectedFuel = useCallback(
+    (v: string) => searchStore.setState((s) => ({ ...s, selectedFuel: v })),
+    []
+  );
+  const setSelectedBrand = useCallback(
+    (v: string) => searchStore.setState((s) => ({ ...s, selectedBrand: v })),
+    []
+  );
+
 
   const { data: brands = [] } = useQuery({
     queryKey: ['brands'],
@@ -76,7 +101,7 @@ export default function HomePage() {
     isLoading: loading,
     error: searchError,
   } = useQuery({
-    queryKey: ['stations', selectedFuel, selectedDistrict, selectedBrand, searchTrigger],
+    queryKey: ['stations', selectedFuel, selectedDistrict, selectedBrand],
     queryFn: () => fetchStations({ selectedFuel, selectedDistrict, selectedBrand }),
     enabled: hasSearched,
   });
@@ -104,8 +129,7 @@ export default function HomePage() {
 
   const searchStations = useCallback(() => {
     setLocationError('');
-    setHasSearched(true);
-    setSearchTrigger((t) => t + 1);
+    searchStore.setState((s) => ({ ...s, hasSearched: true }));
   }, []);
 
   const locateMe = useCallback(() => {
@@ -117,15 +141,17 @@ export default function HomePage() {
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setUserLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        });
         setIsLocating(false);
-        setSelectedDistrict('');
         setLocationError('');
-        setHasSearched(true);
-        setSearchTrigger((t) => t + 1);
+        searchStore.setState((s) => ({
+          ...s,
+          selectedDistrict: '',
+          userLocation: {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          },
+          hasSearched: true,
+        }));
       },
       () => {
         setLocationError(
@@ -150,7 +176,11 @@ export default function HomePage() {
   }, [stations, selectedFuel]);
 
   const handleStationClick = useCallback((station: Station) => {
-    window.location.href = `/posto/${station.Id}`;
+    searchStore.setState((s) => ({ ...s, selectedStation: station }));
+  }, []);
+
+  const handleCloseStation = useCallback(() => {
+    searchStore.setState((s) => ({ ...s, selectedStation: null }));
   }, []);
 
   const fuelTypeName = FUEL_TYPES[Number(selectedFuel)] || 'Gasóleo simples';
@@ -289,6 +319,7 @@ export default function HomePage() {
               stations={stations}
               userLocation={userLocation}
               selectedFuel={fuelTypeName}
+              selectedStationId={selectedStation?.Id ?? null}
               onStationClick={handleStationClick}
             />
           </div>
@@ -362,6 +393,7 @@ export default function HomePage() {
           </Button>
         </div>
       )}
+      <StationDrawer station={selectedStation} onClose={handleCloseStation} />
     </div>
   );
 }
