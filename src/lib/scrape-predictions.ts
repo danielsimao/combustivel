@@ -22,8 +22,14 @@ export interface ScrapedPredictions {
 
 function detectTrend(text: string): 'sobe' | 'desce' | 'neutro' {
   const lower = text.toLowerCase();
-  if (lower.includes('sobe') || lower.includes('subir') || lower.includes('aument')) return 'sobe';
-  if (lower.includes('desce') || lower.includes('descer') || lower.includes('baixa') || lower.includes('redução') || lower.includes('reduz')) return 'desce';
+  // Count occurrences of up vs down keywords to handle mixed text
+  const upWords = ['sobe', 'subir', 'subida', 'aument'];
+  const downWords = ['desce', 'descer', 'descida', 'baixa', 'redução', 'reduz'];
+  const upCount = upWords.reduce((n, w) => n + (lower.split(w).length - 1), 0);
+  const downCount = downWords.reduce((n, w) => n + (lower.split(w).length - 1), 0);
+  if (upCount > downCount) return 'sobe';
+  if (downCount > upCount) return 'desce';
+  if (upCount > 0) return 'sobe';
   return 'neutro';
 }
 

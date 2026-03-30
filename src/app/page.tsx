@@ -10,6 +10,7 @@ import { StationMap } from '@/components/map/station-map';
 import { StationCard } from '@/components/stations/station-card';
 import { StationDrawer } from '@/components/stations/station-drawer';
 import { SearchFilters } from '@/components/stations/search-filters';
+import { PredictionHero } from '@/components/predictions/prediction-hero';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,12 +23,11 @@ import {
 } from '@/lib/utils';
 import {
   Fuel,
-  TrendingDown,
   MapPin,
-  ArrowRight,
   AlertCircle,
+  SlidersHorizontal,
+  LocateFixed,
 } from 'lucide-react';
-import Link from 'next/link';
 
 async function fetchBrands(): Promise<Brand[]> {
   const r = await fetch('/api/dgeg/marcas');
@@ -215,95 +215,60 @@ export default function HomePage() {
 
   const fuelTypeName = FUEL_TYPES[Number(selectedFuel)] || 'Gasóleo simples';
 
+  const [showFilters, setShowFilters] = useState(false);
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-      {/* Hero */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl dark:text-white">
-          Encontre o combustível mais barato
-        </h1>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          Pesquise por distrito ou ative a localização para ver os postos mais
-          próximos com os melhores preços.
-        </p>
-      </div>
+      {/* Prediction Hero */}
+      <PredictionHero />
 
-      {/* Quick Actions */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <Link href="/previsao">
-          <Card className="group cursor-pointer transition-all hover:border-blue-200 hover:shadow-md">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
-                <TrendingDown className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                  Previsão Semanal
-                </p>
-                <p className="text-xs text-zinc-500">
-                  O preço vai descer na próxima semana?
-                </p>
-              </div>
-              <ArrowRight className="ml-auto h-4 w-4 text-zinc-400" />
+      {/* Map Section */}
+      <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
+            Onde abastecer
+          </h2>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              variant="ghost"
+              size="sm"
+            >
+              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+              Filtros
+            </Button>
+            <Button
+              onClick={locateMe}
+              variant={hasSearched ? 'outline' : 'primary'}
+              size="sm"
+              disabled={isLocating}
+            >
+              <LocateFixed className={`mr-1.5 h-3.5 w-3.5 ${isLocating ? 'animate-pulse' : ''}`} />
+              {isLocating ? 'A localizar...' : 'Perto de mim'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Collapsible Filters */}
+        {showFilters && (
+          <Card className="mb-4">
+            <CardContent className="p-4">
+              <SearchFilters
+                selectedDistrict={selectedDistrict}
+                selectedFuel={selectedFuel}
+                selectedBrand={selectedBrand}
+                onDistrictChange={setSelectedDistrict}
+                onFuelChange={setSelectedFuel}
+                onBrandChange={setSelectedBrand}
+                onSearch={searchStations}
+                onLocateMe={locateMe}
+                isLocating={isLocating}
+                brands={brands}
+              />
             </CardContent>
           </Card>
-        </Link>
-        <Link href="/estatisticas">
-          <Card className="group cursor-pointer transition-all hover:border-green-200 hover:shadow-md">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100 text-green-600 transition-colors group-hover:bg-green-600 group-hover:text-white">
-                <Fuel className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                  Estatísticas
-                </p>
-                <p className="text-xs text-zinc-500">
-                  Evolução histórica dos preços
-                </p>
-              </div>
-              <ArrowRight className="ml-auto h-4 w-4 text-zinc-400" />
-            </CardContent>
-          </Card>
-        </Link>
-        <Card
-          className="group cursor-pointer transition-all hover:border-amber-200 hover:shadow-md"
-          onClick={locateMe}
-        >
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 transition-colors group-hover:bg-amber-600 group-hover:text-white">
-              <MapPin className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                Perto de Mim
-              </p>
-              <p className="text-xs text-zinc-500">
-                Postos mais baratos na sua zona
-              </p>
-            </div>
-            <ArrowRight className="ml-auto h-4 w-4 text-zinc-400" />
-          </CardContent>
-        </Card>
+        )}
       </div>
-
-      {/* Search Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <SearchFilters
-            selectedDistrict={selectedDistrict}
-            selectedFuel={selectedFuel}
-            selectedBrand={selectedBrand}
-            onDistrictChange={setSelectedDistrict}
-            onFuelChange={setSelectedFuel}
-            onBrandChange={setSelectedBrand}
-            onSearch={searchStations}
-            onLocateMe={locateMe}
-            isLocating={isLocating}
-            brands={brands}
-          />
-        </CardContent>
-      </Card>
 
       {/* Error */}
       {error && (
@@ -386,34 +351,21 @@ export default function HomePage() {
 
       {/* Empty State */}
       {!loading && hasSearched && stations.length === 0 && !error && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Fuel className="mb-4 h-12 w-12 text-zinc-300" />
-          <h3 className="text-lg font-semibold text-zinc-700 dark:text-zinc-300">
-            Nenhum posto encontrado
-          </h3>
-          <p className="mt-1 text-sm text-zinc-500">
-            Tente alterar os filtros ou selecione outro distrito.
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Fuel className="mb-3 h-10 w-10 text-zinc-300" />
+          <p className="text-sm text-zinc-500">
+            Nenhum posto encontrado. Tente alterar os filtros.
           </p>
         </div>
       )}
 
-      {/* Initial state */}
+      {/* Initial state — no search yet */}
       {!loading && !hasSearched && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-950">
-            <Fuel className="h-8 w-8 text-blue-600" />
-          </div>
-          <h3 className="text-lg font-semibold text-zinc-700 dark:text-zinc-300">
-            Pesquise postos de combustível
-          </h3>
-          <p className="mt-2 max-w-md text-sm text-zinc-500">
-            Selecione um distrito e tipo de combustível, ou ative a
-            localização para encontrar os postos mais baratos perto de si.
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <MapPin className="mb-3 h-10 w-10 text-zinc-300" />
+          <p className="text-sm text-zinc-500">
+            Toque em <strong>Perto de mim</strong> para ver os postos mais baratos na sua zona.
           </p>
-          <Button onClick={locateMe} className="mt-6" size="lg">
-            <MapPin className="mr-2 h-4 w-4" />
-            Usar a minha localização
-          </Button>
         </div>
       )}
       <StationDrawer station={selectedStation} onClose={handleCloseStation} />
