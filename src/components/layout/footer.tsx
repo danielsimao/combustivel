@@ -25,7 +25,7 @@ export function Footer() {
             . Uso não comercial.
           </p>
           <p className="text-xs text-zinc-400">
-            Os preços são atualizados pelos postos de abastecimento.
+            Apenas postos que comunicam preços à DGEG. Alguns postos podem não aparecer.
           </p>
         </div>
       </div>

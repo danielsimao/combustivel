@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { Station, Brand } from '@/types';
 import { searchStore } from '@/lib/search-store';
+import { getNearestDistrictId } from '@/lib/districts';
 import { StationMap } from '@/components/map/station-map';
 import { StationCard } from '@/components/stations/station-card';
 import { StationDrawer } from '@/components/stations/station-drawer';
@@ -34,35 +35,55 @@ async function fetchBrands(): Promise<Brand[]> {
   return Array.isArray(data) ? data : [];
 }
 
+function normalizeStations(results: Record<string, unknown>[]): Station[] {
+  return results.map((s) => ({
+    ...s,
+    Combustiveis: s.Combustivel && s.Preco
+      ? [{ TipoCombustivel: s.Combustivel as string, Preco: s.Preco as string, DataAtualizacao: (s.DataAtualizacao as string) || '' }]
+      : s.Combustiveis || [],
+  })) as Station[];
+}
+
 async function fetchStations(params: {
   selectedFuel: string;
   selectedDistrict: string;
   selectedBrand: string;
 }): Promise<Station[]> {
-  const searchParams = new URLSearchParams();
-  if (params.selectedFuel) searchParams.set('idsTiposComb', params.selectedFuel);
-  if (params.selectedDistrict) searchParams.set('idDistrito', params.selectedDistrict);
-  if (params.selectedBrand) searchParams.set('idMarca', params.selectedBrand);
-  searchParams.set('qtdPorPagina', '100');
-  searchParams.set('pagina', '1');
+  const baseParams = new URLSearchParams();
+  if (params.selectedFuel) baseParams.set('idsTiposComb', params.selectedFuel);
+  if (params.selectedDistrict) baseParams.set('idDistrito', params.selectedDistrict);
+  if (params.selectedBrand) baseParams.set('idMarca', params.selectedBrand);
+  baseParams.set('qtdPorPagina', '200');
+  baseParams.set('pagina', '1');
 
-  const res = await fetch(`/api/dgeg/pesquisar?${searchParams.toString()}`);
+  const res = await fetch(`/api/dgeg/pesquisar?${baseParams.toString()}`);
   const data = await res.json();
 
   if (data.erro) {
     throw new Error(data.erro);
   }
 
-  const results = data.resultado || data || [];
+  let results = data.resultado || data || [];
 
-  // DGEG search returns flat objects with Preco/Combustivel fields.
-  // Normalize into Station shape with Combustiveis array for the map.
-  return results.map((s: Record<string, unknown>) => ({
-    ...s,
-    Combustiveis: s.Combustivel && s.Preco
-      ? [{ TipoCombustivel: s.Combustivel as string, Preco: s.Preco as string, DataAtualizacao: (s.DataAtualizacao as string) || '' }]
-      : s.Combustiveis || [],
-  }));
+  // Fetch remaining pages if there are more results
+  const total = results[0]?.Quantidade;
+  if (total && total > 200) {
+    const pages = Math.ceil(total / 200);
+    const fetches = [];
+    for (let p = 2; p <= pages; p++) {
+      const pageParams = new URLSearchParams(baseParams);
+      pageParams.set('pagina', String(p));
+      fetches.push(
+        fetch(`/api/dgeg/pesquisar?${pageParams.toString()}`)
+          .then((r) => r.json())
+          .then((d) => d.resultado || [])
+      );
+    }
+    const extra = await Promise.all(fetches);
+    results = results.concat(...extra);
+  }
+
+  return normalizeStations(results);
 }
 
 export default function HomePage() {
@@ -144,9 +165,13 @@ export default function HomePage() {
       (pos) => {
         setIsLocating(false);
         setLocationError('');
+        const nearestDistrict = getNearestDistrictId(
+          pos.coords.latitude,
+          pos.coords.longitude
+        );
         searchStore.setState((s) => ({
           ...s,
-          selectedDistrict: '',
+          selectedDistrict: nearestDistrict,
           userLocation: {
             lat: pos.coords.latitude,
             lng: pos.coords.longitude,
