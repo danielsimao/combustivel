@@ -5,25 +5,15 @@ import { PriceForecast } from '@/components/predictions/price-forecast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Calendar,
   ExternalLink,
   Lightbulb,
   BarChart3,
   AlertTriangle,
+  Globe,
+  AlertCircle,
+  Calendar,
 } from 'lucide-react';
 import { FuelPrediction } from '@/lib/scrape-predictions';
-
-interface PredictionInfo {
-  fuelType: string;
-  fuelLabel: string;
-  currentPrice: string;
-  predictedChange: number;
-  direction: 'up' | 'down' | 'stable';
-  weekRange: string;
-  recommendation: string;
-  source: string;
-  factors: string[];
-}
 
 interface PredictionData {
   predictions: FuelPrediction[];
@@ -47,7 +37,7 @@ function getFactors(trend: string): string[] {
     return [
       'Cotações internacionais em alta',
       'Possível pressão do câmbio EUR/USD',
-      'Verifique se o ISP será ajustado pelo governo',
+      'Tensões geopolíticas mantêm pressão no crude',
     ];
   }
   if (trend === 'desce') {
@@ -103,20 +93,23 @@ export default function PrevisaoPage() {
   const scrapeError = predData?.error ?? '';
   const scrapedAt = predData?.scrapedAt ?? '';
 
-  // Build predictions from scraped data
-  const predictions: PredictionInfo[] = scrapedPredictions.map((sp) => ({
-    fuelType: sp.fuelType,
-    fuelLabel: sp.fuelLabel,
-    currentPrice: avgPrices[sp.fuelType]
-      ? `${avgPrices[sp.fuelType].toFixed(3).replace('.', ',')} €/L`
-      : '—',
-    predictedChange: sp.variationEuro,
-    direction: sp.trend === 'sobe' ? 'up' : sp.trend === 'desce' ? 'down' : 'stable',
-    weekRange: sp.week || 'Próxima semana',
-    recommendation: getRecommendation(sp.trend, sp.fuelLabel),
-    source: `precocombustiveis.pt — ${sp.text.substring(0, 120)}${sp.text.length > 120 ? '...' : ''}`,
-    factors: getFactors(sp.trend),
-  }));
+  const predictions = scrapedPredictions.map((sp) => {
+    const priceNum = avgPrices[sp.fuelType] ?? 0;
+    return {
+      fuelType: sp.fuelType,
+      fuelLabel: sp.fuelLabel,
+      currentPrice: priceNum > 0
+        ? `${priceNum.toFixed(3).replace('.', ',')} €/L`
+        : '—',
+      currentPriceNum: priceNum,
+      predictedChange: sp.variationEuro,
+      direction: (sp.trend === 'sobe' ? 'up' : sp.trend === 'desce' ? 'down' : 'stable') as 'up' | 'down' | 'stable',
+      weekRange: sp.week || 'Próxima semana',
+      recommendation: getRecommendation(sp.trend, sp.fuelLabel),
+      source: 'precocombustiveis.pt',
+      factors: getFactors(sp.trend),
+    };
+  });
 
   const hasPredictions = predictions.length > 0;
 
@@ -128,232 +121,269 @@ export default function PrevisaoPage() {
         hour: '2-digit',
         minute: '2-digit',
       })
-    : new Date().toLocaleDateString('pt-PT', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      });
+    : null;
+
+  // Collect all unique factors
+  const allFactors = [...new Set(predictions.flatMap((p) => p.factors))];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+          Previsão Semanal
+        </h1>
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-zinc-500">
+          {predictions[0]?.weekRange && (
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              {predictions[0].weekRange}
+            </span>
+          )}
+          {lastUpdated && (
+            <span className="text-xs text-zinc-400">
+              Atualizado: {lastUpdated}
+            </span>
+          )}
+        </div>
+      </div>
+
       {loading ? (
         <div className="space-y-4">
-          <Skeleton className="h-32 w-full rounded-xl" />
           <div className="grid gap-4 sm:grid-cols-2">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-64 rounded-xl" />
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className="h-72 rounded-xl" />
             ))}
           </div>
         </div>
-      ) : (
+      ) : hasPredictions ? (
         <>
-          {hasPredictions ? (
-            <PriceForecast predictions={predictions} lastUpdated={lastUpdated} />
-          ) : (
-            /* Fallback when scraping fails */
-            <div className="space-y-6">
-              <div className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold">Previsão Semanal</h2>
-                    <p className="mt-1 text-sm text-blue-100">
-                      Os preços em Portugal atualizam às segundas-feiras
-                    </p>
-                  </div>
-                  <Calendar className="h-8 w-8 text-blue-200" />
+          <PriceForecast predictions={predictions} lastUpdated={lastUpdated ?? ''} />
+
+          {/* Market Context */}
+          {allFactors.length > 0 && (
+            <Card className="mt-6 overflow-hidden border-l-[6px] border-l-amber-400 bg-amber-50/30 dark:bg-amber-950/10">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
+                  <Globe className="h-4 w-4 text-amber-500" />
+                  Contexto de Mercado
                 </div>
-              </div>
-
-              <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
-                <CardContent className="flex items-start gap-3 p-4">
-                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                      Previsão automática temporariamente indisponível
-                    </p>
-                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                      {scrapeError
-                        ? `Motivo: ${scrapeError}`
-                        : 'Não foi possível obter os dados de previsão automaticamente.'}
-                      {' '}Consulte as fontes abaixo para a previsão mais recente.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Show current average prices from DGEG */}
-              {Object.keys(avgPrices).length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Preços Médios Atuais (DGEG)</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {Object.entries(avgPrices)
-                        .filter(([key]) =>
-                          ['Gasóleo simples', 'Gasolina simples 95', 'Gasolina especial 98', 'GPL Auto'].includes(key)
-                        )
-                        .map(([fuel, price]) => (
-                          <div
-                            key={fuel}
-                            className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
-                          >
-                            <span className="text-sm text-zinc-600 dark:text-zinc-400">{fuel}</span>
-                            <span className="text-lg font-bold text-zinc-900 dark:text-white">
-                              {price.toFixed(3).replace('.', ',')} €/L
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                <ul className="mt-3 space-y-2">
+                  {allFactors.map((factor, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                      {factor}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           )}
 
-          {/* Price breakdown explanation */}
-          <div className="mt-8">
-            <h2 className="mb-4 text-lg font-bold text-zinc-900 dark:text-white">
-              Como é formado o preço?
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <BarChart3 className="h-4 w-4 text-blue-600" />
-                    Componentes do Preço
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {[
-                      { label: 'Cotação internacional (Platts)', pct: 35, color: 'bg-blue-500' },
-                      { label: 'ISP + Taxa de Carbono', pct: 30, color: 'bg-red-500' },
-                      { label: 'IVA (23%)', pct: 19, color: 'bg-amber-500' },
-                      { label: 'Biocombustíveis (13%)', pct: 6, color: 'bg-green-500' },
-                      { label: 'Margem comercial + logística', pct: 10, color: 'bg-zinc-400' },
-                    ].map((item) => (
-                      <div key={item.label}>
-                        <div className="mb-1 flex justify-between text-xs">
-                          <span className="text-zinc-600">{item.label}</span>
-                          <span className="font-medium">~{item.pct}%</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-zinc-100">
-                          <div
-                            className={`h-full rounded-full ${item.color}`}
-                            style={{ width: `${item.pct}%` }}
-                          />
-                        </div>
+          {/* How the prediction works */}
+          <Card className="mt-6 overflow-hidden border-l-[6px] border-l-zinc-300 dark:border-l-zinc-600">
+            <CardContent className="flex items-start gap-3 p-5">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-zinc-400" />
+              <div>
+                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Como funciona a previsão?
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Em Portugal, os preços dos combustíveis atualizam às segundas-feiras.
+                  A previsão baseia-se nas cotações internacionais Platts, no câmbio EUR/USD,
+                  no preço do Brent, e nos impostos (ISP + IVA a 23%). A ENSE publica
+                  diariamente preços de referência. Cada posto define livremente o seu preço final.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        /* Fallback */
+        <div className="space-y-6">
+          <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+            <CardContent className="flex items-start gap-3 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Previsão temporariamente indisponível
+                </p>
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                  {scrapeError
+                    ? `Motivo: ${scrapeError}`
+                    : 'Não foi possível obter os dados de previsão.'}
+                  {' '}Consulte as fontes abaixo.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {Object.keys(avgPrices).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Preços Médios Atuais (DGEG)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {Object.entries(avgPrices)
+                    .filter(([key]) =>
+                      ['Gasóleo simples', 'Gasolina simples 95'].includes(key)
+                    )
+                    .map(([fuel, price]) => (
+                      <div
+                        key={fuel}
+                        className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
+                      >
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">{fuel}</span>
+                        <span className="text-lg font-bold text-zinc-900 dark:text-white">
+                          {price.toFixed(3).replace('.', ',')} €/L
+                        </span>
                       </div>
                     ))}
-                  </div>
-                  <p className="mt-3 text-[10px] text-zinc-400">
-                    Cerca de 55% do preço final são impostos (ISP + IVA)
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Lightbulb className="h-4 w-4 text-amber-500" />
-                    Dicas para Poupar
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3 text-sm text-zinc-600">
-                    {[
-                      {
-                        title: 'Abasteça à segunda-feira',
-                        desc: 'de manhã, antes da atualização de preços.',
-                      },
-                      {
-                        title: 'Compare postos',
-                        desc: 'na mesma zona. A diferença pode chegar a 10 cêntimos/litro.',
-                      },
-                      {
-                        title: 'Postos de hipermercado',
-                        desc: '(Intermarché, Leclerc, Jumbo) costumam ser mais baratos.',
-                      },
-                      {
-                        title: 'Use cartões de desconto',
-                        desc: '(frota, fidelização) para descontos adicionais.',
-                      },
-                    ].map((tip, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-green-100 text-[10px] font-bold text-green-700">
-                          {i + 1}
-                        </span>
-                        <span>
-                          <strong className="text-zinc-900 dark:text-white">{tip.title}</strong>{' '}
-                          {tip.desc}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* External sources */}
-          <div className="mt-8">
-            <h2 className="mb-4 text-lg font-bold text-zinc-900 dark:text-white">
-              Fontes de Previsão
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                {
-                  name: 'Contas Poupança',
-                  url: 'https://contaspoupanca.pt/carro/combustiveis/',
-                  desc: 'Previsões semanais detalhadas',
-                },
-                {
-                  name: 'precoCombustiveis.pt',
-                  url: 'https://precocombustiveis.pt/proxima-semana/',
-                  desc: 'Previsão para a próxima semana (fonte automática)',
-                },
-                {
-                  name: 'ENSE - Preços de Referência',
-                  url: 'https://www.ense-epe.pt/precos-de-referencia/',
-                  desc: 'Preços de referência diários',
-                },
-                {
-                  name: 'DGEG - Preço Médio',
-                  url: 'https://precoscombustiveis.dgeg.gov.pt/estatistica/preco-medio-diario/',
-                  desc: 'Preço médio diário oficial',
-                },
-                {
-                  name: 'Mais Gasolina',
-                  url: 'https://www.maisgasolina.com/',
-                  desc: 'Comparação de preços por posto',
-                },
-                {
-                  name: 'ACP',
-                  url: 'https://www.acp.pt/',
-                  desc: 'Automóvel Club de Portugal',
-                },
-              ].map((source) => (
-                <a
-                  key={source.name}
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-                >
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                      {source.name}
-                    </p>
-                    <p className="text-xs text-zinc-500">{source.desc}</p>
-                  </div>
-                  <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />
-                </a>
-              ))}
-            </div>
-          </div>
-        </>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
+
+      {/* Price breakdown */}
+      <div className="mt-8">
+        <h2 className="mb-4 text-lg font-bold text-zinc-900 dark:text-white">
+          Como é formado o preço?
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card className="overflow-hidden border-l-[6px] border-l-blue-400">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
+                <BarChart3 className="h-4 w-4 text-blue-500" />
+                Componentes do Preço
+              </div>
+              <div className="mt-4 space-y-3">
+                {[
+                  { label: 'Cotação internacional (Platts)', pct: 35, color: 'bg-blue-500' },
+                  { label: 'ISP + Taxa de Carbono', pct: 30, color: 'bg-red-500' },
+                  { label: 'IVA (23%)', pct: 19, color: 'bg-amber-500' },
+                  { label: 'Biocombustíveis (13%)', pct: 6, color: 'bg-emerald-500' },
+                  { label: 'Margem + logística', pct: 10, color: 'bg-zinc-400' },
+                ].map((item) => (
+                  <div key={item.label}>
+                    <div className="mb-1 flex justify-between text-xs">
+                      <span className="text-zinc-600 dark:text-zinc-400">{item.label}</span>
+                      <span className="font-medium text-zinc-900 dark:text-white">~{item.pct}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                      <div
+                        className={`h-full rounded-full ${item.color}`}
+                        style={{ width: `${item.pct}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-[10px] text-zinc-400">
+                ~55% do preço final são impostos (ISP + IVA)
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-l-[6px] border-l-emerald-400">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
+                <Lightbulb className="h-4 w-4 text-amber-500" />
+                Dicas para Poupar
+              </div>
+              <ul className="mt-4 space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
+                {[
+                  {
+                    title: 'Abasteça à segunda-feira',
+                    desc: 'de manhã, antes da atualização de preços.',
+                  },
+                  {
+                    title: 'Compare postos',
+                    desc: 'na mesma zona. A diferença pode chegar a 10 cêntimos/litro.',
+                  },
+                  {
+                    title: 'Postos de hipermercado',
+                    desc: '(Intermarché, Leclerc, Auchan) costumam ser mais baratos.',
+                  },
+                  {
+                    title: 'Use cartões de desconto',
+                    desc: '(frota, fidelização) para descontos adicionais.',
+                  },
+                ].map((tip, i) => (
+                  <li key={i} className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      {i + 1}
+                    </span>
+                    <span>
+                      <strong className="text-zinc-900 dark:text-white">{tip.title}</strong>{' '}
+                      {tip.desc}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* External sources */}
+      <div className="mt-8">
+        <h2 className="mb-4 text-lg font-bold text-zinc-900 dark:text-white">
+          Fontes de Previsão
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            {
+              name: 'Contas Poupança',
+              url: 'https://contaspoupanca.pt/carro/combustiveis/',
+              desc: 'Previsões semanais detalhadas',
+            },
+            {
+              name: 'precoCombustiveis.pt',
+              url: 'https://precocombustiveis.pt/proxima-semana/',
+              desc: 'Fonte automática da previsão',
+            },
+            {
+              name: 'ENSE',
+              url: 'https://www.ense-epe.pt/precos-de-referencia/',
+              desc: 'Preços de referência diários',
+            },
+            {
+              name: 'DGEG',
+              url: 'https://precoscombustiveis.dgeg.gov.pt/estatistica/preco-medio-diario/',
+              desc: 'Preço médio diário oficial',
+            },
+            {
+              name: 'Mais Gasolina',
+              url: 'https://www.maisgasolina.com/',
+              desc: 'Comparação de preços por posto',
+            },
+            {
+              name: 'ACP',
+              url: 'https://www.acp.pt/',
+              desc: 'Automóvel Club de Portugal',
+            },
+          ].map((source) => (
+            <a
+              key={source.name}
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+            >
+              <div className="flex-1">
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                  {source.name}
+                </p>
+                <p className="text-xs text-zinc-500">{source.desc}</p>
+              </div>
+              <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />
+            </a>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

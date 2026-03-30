@@ -2,9 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, TrendingDown, Minus, ChevronRight, AlertTriangle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { FuelPrediction } from '@/lib/scrape-predictions';
 
@@ -59,9 +58,12 @@ export function PredictionHero() {
 
   if (loading) {
     return (
-      <div className="mb-6 grid gap-3 sm:grid-cols-2">
-        <Skeleton className="h-36 rounded-xl" />
-        <Skeleton className="h-36 rounded-xl" />
+      <div className="mb-6">
+        <Skeleton className="mb-3 h-4 w-40" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -92,75 +94,85 @@ export function PredictionHero() {
     );
   }
 
+  const weekRange = heroPredictions[0]?.week || 'Próxima semana';
+
   return (
-    <div className="mb-6 grid gap-3 sm:grid-cols-2">
-      {heroPredictions.map((pred) => {
-        const direction =
-          pred.trend === 'sobe' ? 'up' : pred.trend === 'desce' ? 'down' : 'stable';
-        const borderColor =
-          direction === 'down'
-            ? 'border-t-green-500'
-            : direction === 'up'
-            ? 'border-t-red-500'
-            : 'border-t-zinc-300';
-        const changeColor =
-          direction === 'down'
-            ? 'text-green-600'
-            : direction === 'up'
-            ? 'text-red-600'
-            : 'text-zinc-500';
-        const price = avgPrices[pred.fuelType];
+    <div className="mb-6">
+      {/* Section header */}
+      <Link
+        href="/previsao"
+        className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-zinc-400 transition-colors hover:text-zinc-600 dark:hover:text-zinc-300"
+      >
+        Previsão Semanal — {weekRange}
+        <ChevronRight className="h-3 w-3" />
+      </Link>
 
-        return (
-          <Link key={pred.fuelType} href="/previsao">
-            <Card
-              className={`border-t-2 ${borderColor} transition-all hover:shadow-md cursor-pointer`}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                    {pred.fuelLabel}
-                  </p>
-                  <Badge
-                    variant={
-                      direction === 'down'
-                        ? 'success'
-                        : direction === 'up'
-                        ? 'danger'
-                        : 'default'
-                    }
-                  >
-                    {direction === 'down' && <TrendingDown className="mr-1 h-3 w-3" />}
-                    {direction === 'up' && <TrendingUp className="mr-1 h-3 w-3" />}
-                    {direction === 'stable' && <Minus className="mr-1 h-3 w-3" />}
-                    {direction === 'down' ? 'Desce' : direction === 'up' ? 'Sobe' : 'Estável'}
-                  </Badge>
-                </div>
+      {/* Hero cards */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {heroPredictions.map((pred) => {
+          const isUp = pred.trend === 'sobe';
+          const isDown = pred.trend === 'desce';
 
-                <div className="mt-3 flex items-baseline gap-3">
-                  {price ? (
-                    <span className="text-2xl font-bold text-zinc-900 dark:text-white">
-                      {price.toFixed(3).replace('.', ',')} €
-                    </span>
-                  ) : null}
-                  <span className={`text-sm font-bold ${changeColor}`}>
-                    {pred.variationEuro > 0 ? '+' : ''}
-                    {pred.variationEuro.toFixed(3).replace('.', ',')} €/L
-                  </span>
-                </div>
+          const bg = isDown
+            ? 'bg-emerald-600 dark:bg-emerald-700'
+            : isUp
+            ? 'bg-red-600 dark:bg-red-700'
+            : 'bg-zinc-600 dark:bg-zinc-700';
 
-                <p className="mt-2 text-xs text-zinc-500">
-                  {getShortRecommendation(pred.trend)}
+          const hoverBg = isDown
+            ? 'hover:bg-emerald-650 hover:shadow-emerald-900/20'
+            : isUp
+            ? 'hover:bg-red-650 hover:shadow-red-900/20'
+            : 'hover:bg-zinc-650 hover:shadow-zinc-900/20';
+
+          const DirectionIcon = isDown
+            ? TrendingDown
+            : isUp
+            ? TrendingUp
+            : Minus;
+
+          const directionWord = isDown ? 'Desce' : isUp ? 'Sobe' : 'Estável';
+          const price = avgPrices[pred.fuelType];
+
+          return (
+            <Link key={pred.fuelType} href="/previsao">
+              <div
+                className={`relative overflow-hidden rounded-xl ${bg} ${hoverBg} p-5 text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl`}
+              >
+                {/* Watermark icon */}
+                <DirectionIcon className="absolute right-4 top-4 h-16 w-16 text-white/10" />
+
+                {/* Fuel label */}
+                <p className="text-[11px] font-medium uppercase tracking-wider text-white/70">
+                  {pred.fuelLabel}
                 </p>
 
-                <div className="mt-2 flex items-center text-[10px] text-blue-600">
-                  Ver detalhes <ChevronRight className="ml-0.5 h-3 w-3" />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        );
-      })}
+                {/* Direction word */}
+                <p className="mt-1 text-lg font-black">{directionWord}</p>
+
+                {/* Hero variation number */}
+                <p className="mt-2 text-3xl font-black tracking-tight">
+                  {pred.variationEuro > 0 ? '+' : ''}
+                  {pred.variationEuro.toFixed(3).replace('.', ',')}
+                  <span className="ml-1 text-base font-bold text-white/70">€/L</span>
+                </p>
+
+                {/* Current price */}
+                {price ? (
+                  <p className="mt-2 text-xs text-white/60">
+                    Preço atual: {price.toFixed(3).replace('.', ',')} €/L
+                  </p>
+                ) : null}
+
+                {/* Recommendation */}
+                <p className="mt-3 text-xs font-medium text-white/80">
+                  {getShortRecommendation(pred.trend)}
+                </p>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
