@@ -8,6 +8,7 @@ interface SearchState {
   hasSearched: boolean;
   userLocation: { lat: number; lng: number } | null;
   selectedStation: Station | null;
+  sortMode: 'price' | 'distance';
 }
 
 export const searchStore = new Store<SearchState>({
@@ -17,4 +18,5 @@ export const searchStore = new Store<SearchState>({
   hasSearched: false,
   userLocation: null,
   selectedStation: null,
+  sortMode: 'price',
 });

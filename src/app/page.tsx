@@ -73,6 +73,7 @@ export default function HomePage() {
   const hasSearched = useStore(searchStore, (s) => s.hasSearched);
   const userLocation = useStore(searchStore, (s) => s.userLocation);
   const selectedStation = useStore(searchStore, (s) => s.selectedStation);
+  const sortMode = useStore(searchStore, (s) => s.sortMode);
 
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
@@ -151,6 +152,7 @@ export default function HomePage() {
             lng: pos.coords.longitude,
           },
           hasSearched: true,
+          sortMode: 'distance',
         }));
       },
       () => {
@@ -163,7 +165,10 @@ export default function HomePage() {
     );
   }, []);
 
-  const sortedByPrice = useMemo(() => {
+  const sortedStations = useMemo(() => {
+    if (sortMode === 'distance' && userLocation) {
+      return stations;
+    }
     return [...stations]
       .map((s) => {
         const fuel = s.Combustiveis?.find(
@@ -173,7 +178,7 @@ export default function HomePage() {
       })
       .filter((s) => s._price < Infinity)
       .sort((a, b) => a._price - b._price);
-  }, [stations, selectedFuel]);
+  }, [stations, selectedFuel, sortMode, userLocation]);
 
   const handleStationClick = useCallback((station: Station) => {
     searchStore.setState((s) => ({ ...s, selectedStation: station }));
@@ -298,19 +303,35 @@ export default function HomePage() {
       {/* Results */}
       {!loading && hasSearched && stations.length > 0 && (
         <>
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
-                {stations.length} postos encontrados
-              </h2>
-              <Badge variant="outline">{getFuelShortName(fuelTypeName)}</Badge>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+              {stations.length} postos
+            </h2>
+            <Badge variant="outline">{getFuelShortName(fuelTypeName)}</Badge>
+            <div className="ml-auto flex gap-1.5">
+              <button
+                onClick={() => searchStore.setState((s) => ({ ...s, sortMode: 'price' }))}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  sortMode === 'price'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
+                }`}
+              >
+                Preço
+              </button>
+              {userLocation && (
+                <button
+                  onClick={() => searchStore.setState((s) => ({ ...s, sortMode: 'distance' }))}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                    sortMode === 'distance'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
+                  }`}
+                >
+                  Distância
+                </button>
+              )}
             </div>
-            {userLocation && (
-              <Badge variant="success">
-                <MapPin className="mr-1 h-3 w-3" />
-                Ordenado por distância
-              </Badge>
-            )}
           </div>
 
           {/* Map */}
@@ -324,32 +345,9 @@ export default function HomePage() {
             />
           </div>
 
-          {/* Top 3 cheapest */}
-          {sortedByPrice.length > 0 && (
-            <div className="mb-6">
-              <h3 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                Mais baratos ({getFuelShortName(fuelTypeName)})
-              </h3>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {sortedByPrice.slice(0, 3).map((station, i) => (
-                  <StationCard
-                    key={station.Id}
-                    station={station}
-                    userLocation={userLocation}
-                    selectedFuel={fuelTypeName}
-                    rank={i + 1}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* All stations */}
-          <h3 className="mb-3 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-            Todos os postos
-          </h3>
+          {/* Station list */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(userLocation ? stations : sortedByPrice).map((station) => (
+            {sortedStations.map((station) => (
               <StationCard
                 key={station.Id}
                 station={station}
