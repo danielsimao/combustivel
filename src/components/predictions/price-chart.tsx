@@ -49,13 +49,20 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+          <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 11 }}
+              tick={{ fontSize: 10 }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
+              angle={-45}
+              textAnchor="end"
+              height={50}
+              tickFormatter={(v) => {
+                const d = new Date(v);
+                return `${d.getDate()}/${d.getMonth() + 1}`;
+              }}
             />
             <YAxis
               tick={{ fontSize: 11 }}
