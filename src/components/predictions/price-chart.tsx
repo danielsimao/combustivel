@@ -53,7 +53,7 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
             <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 10, fill: '#71717a' }}
+              tick={{ fontSize: 10, fill: '#18181b' }}
               tickLine={false}
               axisLine={{ stroke: '#e4e4e7' }}
               angle={-45}
