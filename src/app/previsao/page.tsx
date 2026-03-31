@@ -1,18 +1,23 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PriceForecast } from '@/components/predictions/price-forecast';
+import { PriceChart } from '@/components/predictions/price-chart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ExternalLink,
-  Lightbulb,
   BarChart3,
   AlertTriangle,
   AlertCircle,
   Calendar,
+  Fuel,
+  ChevronDown,
 } from 'lucide-react';
 import { FuelPrediction } from '@/lib/scrape-predictions';
+import { getDailyAverages } from '@/lib/supabase';
+import { getFuelColor } from '@/lib/utils';
 
 interface PredictionData {
   predictions: FuelPrediction[];
@@ -20,6 +25,14 @@ interface PredictionData {
   source: string;
   error?: string;
 }
+
+interface DailyAvg {
+  date: string;
+  fuel_type: string;
+  avg_price: number;
+}
+
+const CHART_FUELS = ['Gasóleo simples', 'Gasolina simples 95'];
 
 async function fetchAvgPrices(): Promise<Record<string, number>> {
   const r = await fetch('/api/dgeg/preco-medio');
@@ -42,7 +55,16 @@ async function fetchPredictions(): Promise<PredictionData> {
   return r.json();
 }
 
+async function fetchChartData(): Promise<DailyAvg[]> {
+  const results = await Promise.all(
+    CHART_FUELS.map((fuel) => getDailyAverages(fuel, 30))
+  );
+  return results.flat().filter(Boolean) as DailyAvg[];
+}
+
 export default function PrevisaoPage() {
+  const [tankSize, setTankSize] = useState(50);
+
   const {
     data: avgPrices = {},
     isLoading: pricesLoading,
@@ -57,6 +79,14 @@ export default function PrevisaoPage() {
   } = useQuery({
     queryKey: ['predictions'],
     queryFn: fetchPredictions,
+  });
+
+  const {
+    data: chartRaw = [],
+    isLoading: chartLoading,
+  } = useQuery({
+    queryKey: ['priceChart30d'],
+    queryFn: fetchChartData,
   });
 
   const loading = pricesLoading || predLoading;
@@ -93,11 +123,27 @@ export default function PrevisaoPage() {
       })
     : null;
 
+  // Build chart data
+  const chartData = (() => {
+    const dateMap = new Map<string, { date: string; [key: string]: string | number | undefined }>();
+    for (const item of chartRaw) {
+      if (!dateMap.has(item.date)) {
+        dateMap.set(item.date, { date: item.date });
+      }
+      dateMap.get(item.date)![item.fuel_type] = item.avg_price;
+    }
+    return Array.from(dateMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+  })();
+
+  const hasChartData = chartData.length > 0;
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
       {/* Page Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+        <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
           Previsão Semanal
         </h1>
         <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-zinc-500">
@@ -125,25 +171,93 @@ export default function PrevisaoPage() {
         </div>
       ) : hasPredictions ? (
         <>
+          {/* Prediction Cards */}
           <PriceForecast predictions={predictions} lastUpdated={lastUpdated ?? ''} />
 
-          {/* How the prediction works */}
-          <Card className="mt-6 overflow-hidden border-l-[6px] border-l-zinc-300 dark:border-l-zinc-600">
-            <CardContent className="flex items-start gap-3 p-5">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-zinc-400" />
-              <div>
-                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  Como funciona a previsão?
+          {/* 30-Day Price Chart */}
+          {chartLoading ? (
+            <Skeleton className="mt-6 h-64 rounded-xl" />
+          ) : hasChartData ? (
+            <div className="mt-6">
+              <PriceChart
+                data={chartData}
+                fuelTypes={CHART_FUELS}
+                title="Últimos 30 dias"
+                height={280}
+              />
+            </div>
+          ) : (
+            <Card className="mt-6">
+              <CardContent className="py-8 text-center">
+                <p className="text-sm text-zinc-400">
+                  Dados em recolha — o gráfico aparece após alguns dias.
                 </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Em Portugal, os preços dos combustíveis atualizam às segundas-feiras.
-                  A previsão baseia-se nas cotações internacionais Platts, no câmbio EUR/USD,
-                  no preço do Brent, e nos impostos (ISP + IVA a 23%). A ENSE publica
-                  diariamente preços de referência. Cada posto define livremente o seu preço final.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tank Cost Calculator */}
+          {predictions.length > 0 && (
+            <Card className="mt-6">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
+                  <Fuel className="h-4 w-4 text-blue-500" />
+                  Quanto vai custar o meu depósito?
+                </div>
+
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-zinc-500">Tamanho do depósito</span>
+                    <span className="font-bold text-zinc-900 dark:text-white">{tankSize}L</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={10}
+                    max={80}
+                    step={5}
+                    value={tankSize}
+                    onChange={(e) => setTankSize(Number(e.target.value))}
+                    className="mt-2 w-full accent-blue-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-zinc-400">
+                    <span>10L</span>
+                    <span>80L</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {predictions.map((pred) => {
+                    const impact = pred.predictedChange * tankSize;
+                    const isUp = pred.direction === 'up';
+                    const isDown = pred.direction === 'down';
+                    const color = isDown
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : isUp
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-zinc-500';
+
+                    return (
+                      <div key={pred.fuelType} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: getFuelColor(pred.fuelType) }}
+                          />
+                          <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                            {pred.fuelLabel}
+                          </span>
+                        </div>
+                        <span className={`text-lg font-black ${color}`}>
+                          {impact > 0 ? '+' : impact < 0 ? '−' : ''}
+                          {Math.abs(impact).toFixed(2).replace('.', ',')} €
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       ) : (
         /* Fallback */
@@ -194,93 +308,70 @@ export default function PrevisaoPage() {
         </div>
       )}
 
-      {/* Price breakdown */}
-      <div className="mt-8">
-        <h2 className="mb-4 text-lg font-bold text-zinc-900 dark:text-white">
-          Como é formado o preço?
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card className="overflow-hidden border-l-[6px] border-l-blue-400">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
-                <BarChart3 className="h-4 w-4 text-blue-500" />
-                Componentes do Preço
-              </div>
-              <div className="mt-4 space-y-3">
-                {[
-                  { label: 'Cotação internacional (Platts)', pct: 35, color: 'bg-blue-500' },
-                  { label: 'ISP + Taxa de Carbono', pct: 30, color: 'bg-red-500' },
-                  { label: 'IVA (23%)', pct: 19, color: 'bg-amber-500' },
-                  { label: 'Biocombustíveis (13%)', pct: 6, color: 'bg-emerald-500' },
-                  { label: 'Margem + logística', pct: 10, color: 'bg-zinc-400' },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-zinc-600 dark:text-zinc-400">{item.label}</span>
-                      <span className="font-medium text-zinc-900 dark:text-white">~{item.pct}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                      <div
-                        className={`h-full rounded-full ${item.color}`}
-                        style={{ width: `${item.pct}%` }}
-                      />
-                    </div>
+      {/* Accordion: Educational content */}
+      <div className="mt-8 space-y-2">
+        <details className="group rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-blue-500" />
+              Como é formado o preço?
+            </div>
+            <ChevronDown className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
+            <div className="space-y-3">
+              {[
+                { label: 'Cotação internacional (Platts)', pct: 35, color: 'bg-blue-500' },
+                { label: 'ISP + Taxa de Carbono', pct: 30, color: 'bg-red-500' },
+                { label: 'IVA (23%)', pct: 19, color: 'bg-amber-500' },
+                { label: 'Biocombustíveis (13%)', pct: 6, color: 'bg-emerald-500' },
+                { label: 'Margem + logística', pct: 10, color: 'bg-zinc-400' },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span className="text-zinc-600 dark:text-zinc-400">{item.label}</span>
+                    <span className="font-medium text-zinc-900 dark:text-white">~{item.pct}%</span>
                   </div>
-                ))}
-              </div>
-              <p className="mt-3 text-[10px] text-zinc-400">
-                ~55% do preço final são impostos (ISP + IVA)
-              </p>
-            </CardContent>
-          </Card>
+                  <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <div
+                      className={`h-full rounded-full ${item.color}`}
+                      style={{ width: `${item.pct}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[10px] text-zinc-400">
+              ~55% do preço final são impostos (ISP + IVA)
+            </p>
+          </div>
+        </details>
 
-          <Card className="overflow-hidden border-l-[6px] border-l-emerald-400">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
-                <Lightbulb className="h-4 w-4 text-amber-500" />
-                Dicas para Poupar
-              </div>
-              <ul className="mt-4 space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
-                {[
-                  {
-                    title: 'Abasteça à segunda-feira',
-                    desc: 'de manhã, antes da atualização de preços.',
-                  },
-                  {
-                    title: 'Compare postos',
-                    desc: 'na mesma zona. A diferença pode chegar a 10 cêntimos/litro.',
-                  },
-                  {
-                    title: 'Postos de hipermercado',
-                    desc: '(Intermarché, Leclerc, Auchan) costumam ser mais baratos.',
-                  },
-                  {
-                    title: 'Use cartões de desconto',
-                    desc: '(frota, fidelização) para descontos adicionais.',
-                  },
-                ].map((tip, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                      {i + 1}
-                    </span>
-                    <span>
-                      <strong className="text-zinc-900 dark:text-white">{tip.title}</strong>{' '}
-                      {tip.desc}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        </div>
+        <details className="group rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-zinc-400" />
+              Como funciona a previsão?
+            </div>
+            <ChevronDown className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
+            <p className="text-xs text-zinc-500">
+              Em Portugal, os preços dos combustíveis atualizam às segundas-feiras.
+              A previsão baseia-se nas cotações internacionais Platts, no câmbio EUR/USD,
+              no preço do Brent, e nos impostos (ISP + IVA a 23%). A ENSE publica
+              diariamente preços de referência. Cada posto define livremente o seu preço final.
+            </p>
+          </div>
+        </details>
       </div>
 
       {/* External sources */}
       <div className="mt-8">
-        <h2 className="mb-4 text-lg font-bold text-zinc-900 dark:text-white">
-          Fontes de Previsão
+        <h2 className="mb-4 text-sm font-bold text-zinc-700 dark:text-zinc-300">
+          Fontes
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {[
             {
               name: 'Contas Poupança',
@@ -301,16 +392,6 @@ export default function PrevisaoPage() {
               name: 'DGEG',
               url: 'https://precoscombustiveis.dgeg.gov.pt/estatistica/preco-medio-diario/',
               desc: 'Preço médio diário oficial',
-            },
-            {
-              name: 'Mais Gasolina',
-              url: 'https://www.maisgasolina.com/',
-              desc: 'Comparação de preços por posto',
-            },
-            {
-              name: 'ACP',
-              url: 'https://www.acp.pt/',
-              desc: 'Automóvel Club de Portugal',
             },
           ].map((source) => (
             <a
