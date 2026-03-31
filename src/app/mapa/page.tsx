@@ -214,6 +214,8 @@ export default function MapaPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <h1 className="sr-only">Mapa de Postos de Combustível em Portugal</h1>
+
       {/* Controls */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex gap-2">

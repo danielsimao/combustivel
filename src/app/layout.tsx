@@ -6,9 +6,13 @@ import { BottomNav } from "@/components/layout/bottom-nav";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "Combustível - Preços de Combustíveis em Portugal",
+  metadataBase: new URL("https://combustivel-delta.vercel.app"),
+  title: {
+    default: "Previsão Combustíveis — Gasóleo e Gasolina Sobem ou Descem?",
+    template: "%s | Combustível",
+  },
   description:
-    "Encontre o combustível mais barato perto de si. Preços atualizados, previsões semanais e estatísticas dos postos de abastecimento em Portugal.",
+    "Saiba se o gasóleo e a gasolina vão subir ou descer na próxima semana em Portugal. Previsão semanal, mapa de postos e estatísticas de preços.",
   keywords: [
     "combustível",
     "gasolina",
@@ -25,6 +29,10 @@ export const metadata: Metadata = {
       "Encontre o combustível mais barato perto de si. Previsões semanais e estatísticas.",
     locale: "pt_PT",
     type: "website",
+    siteName: "Combustível",
+  },
+  alternates: {
+    canonical: "/",
   },
 };
 
@@ -35,6 +43,22 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt" className="h-full antialiased">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "Combustível",
+              url: "https://combustivel-delta.vercel.app",
+              description:
+                "Previsão semanal dos preços de combustíveis em Portugal. Mapa de postos e estatísticas.",
+              inLanguage: "pt",
+            }),
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col overflow-x-hidden bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
         <Providers>
           <Header />
