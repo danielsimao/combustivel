@@ -60,8 +60,8 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
               textAnchor="end"
               height={50}
               tickFormatter={(v) => {
-                const d = new Date(v);
-                return `${d.getDate()}/${d.getMonth() + 1}`;
+                const [, m, d] = String(v).split('-');
+                return `${parseInt(d)}/${parseInt(m)}`;
               }}
             />
             <YAxis
