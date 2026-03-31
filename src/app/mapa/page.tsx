@@ -187,7 +187,7 @@ export default function MapaPage() {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, []);
+  }, [t]);
 
   const sortedStations = useMemo(() => {
     if (sortMode === 'distance' && userLocation) {

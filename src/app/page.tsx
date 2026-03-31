@@ -65,7 +65,7 @@ async function fetchChartData(): Promise<DailyAvg[]> {
 
 export default function PrevisaoPage() {
   const [tankSize, setTankSize] = useState(50);
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const {
     data: avgPrices = {},
@@ -116,7 +116,7 @@ export default function PrevisaoPage() {
   const hasPredictions = predictions.length > 0;
 
   const lastUpdated = scrapedAt
-    ? new Date(scrapedAt).toLocaleDateString('pt-PT', {
+    ? new Date(scrapedAt).toLocaleDateString(locale === 'pt' ? 'pt-PT' : 'en-GB', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
