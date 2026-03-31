@@ -1,374 +1,417 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useStore } from '@tanstack/react-store';
-import { Station, Brand } from '@/types';
-import { searchStore } from '@/lib/search-store';
-import { getNearestDistrictId } from '@/lib/districts';
-import { StationMap } from '@/components/map/station-map';
-import { StationCard } from '@/components/stations/station-card';
-import { StationDrawer } from '@/components/stations/station-drawer';
-import { SearchFilters } from '@/components/stations/search-filters';
-import { PredictionHero } from '@/components/predictions/prediction-hero';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { PriceForecast } from '@/components/predictions/price-forecast';
+import { PriceChart } from '@/components/predictions/price-chart';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  calculateDistance,
-  parsePrice,
-  FUEL_TYPES,
-  getFuelShortName,
-} from '@/lib/utils';
-import {
-  Fuel,
-  MapPin,
+  ExternalLink,
+  BarChart3,
+  AlertTriangle,
   AlertCircle,
-  SlidersHorizontal,
-  LocateFixed,
+  Calendar,
+  Fuel,
+  ChevronDown,
 } from 'lucide-react';
+import { FuelPrediction } from '@/lib/scrape-predictions';
+import { getDailyAverages } from '@/lib/supabase';
+import { getFuelColor } from '@/lib/utils';
 
-async function fetchBrands(): Promise<Brand[]> {
-  const r = await fetch('/api/dgeg/marcas');
+interface PredictionData {
+  predictions: FuelPrediction[];
+  scrapedAt: string;
+  source: string;
+  error?: string;
+}
+
+interface DailyAvg {
+  date: string;
+  fuel_type: string;
+  avg_price: number;
+}
+
+const CHART_FUELS = ['Gasóleo simples', 'Gasolina simples 95'];
+
+async function fetchAvgPrices(): Promise<Record<string, number>> {
+  const r = await fetch('/api/dgeg/preco-medio');
   const data = await r.json();
-  return Array.isArray(data) ? data : [];
-}
-
-function normalizeStations(results: Record<string, unknown>[]): Station[] {
-  return results.map((s) => ({
-    ...s,
-    Combustiveis: s.Combustivel && s.Preco
-      ? [{ TipoCombustivel: s.Combustivel as string, Preco: s.Preco as string, DataAtualizacao: (s.DataAtualizacao as string) || '' }]
-      : s.Combustiveis || [],
-  })) as Station[];
-}
-
-async function fetchStations(params: {
-  selectedFuel: string;
-  selectedDistrict: string;
-  selectedBrand: string;
-}): Promise<Station[]> {
-  const baseParams = new URLSearchParams();
-  if (params.selectedFuel) baseParams.set('idsTiposComb', params.selectedFuel);
-  if (params.selectedDistrict) baseParams.set('idDistrito', params.selectedDistrict);
-  if (params.selectedBrand) baseParams.set('idMarca', params.selectedBrand);
-  baseParams.set('qtdPorPagina', '200');
-  baseParams.set('pagina', '1');
-
-  const res = await fetch(`/api/dgeg/pesquisar?${baseParams.toString()}`);
-  const data = await res.json();
-
-  if (data.erro) {
-    throw new Error(data.erro);
-  }
-
-  let results = data.resultado || data || [];
-
-  // Fetch remaining pages if there are more results
-  const total = results[0]?.Quantidade;
-  if (total && total > 200) {
-    const pages = Math.ceil(total / 200);
-    const fetches = [];
-    for (let p = 2; p <= pages; p++) {
-      const pageParams = new URLSearchParams(baseParams);
-      pageParams.set('pagina', String(p));
-      fetches.push(
-        fetch(`/api/dgeg/pesquisar?${pageParams.toString()}`)
-          .then((r) => r.json())
-          .then((d) => d.resultado || [])
-      );
+  const prices: Record<string, number> = {};
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      if (item.TipoCombustivel && item.PrecoMedio) {
+        prices[item.TipoCombustivel] = parseFloat(
+          String(item.PrecoMedio).replace(',', '.')
+        );
+      }
     }
-    const extra = await Promise.all(fetches);
-    results = results.concat(...extra);
   }
-
-  return normalizeStations(results);
+  return prices;
 }
 
-export default function HomePage() {
-  // Read state from TanStack Store — persists across navigations
-  const selectedDistrict = useStore(searchStore, (s) => s.selectedDistrict);
-  const selectedFuel = useStore(searchStore, (s) => s.selectedFuel);
-  const selectedBrand = useStore(searchStore, (s) => s.selectedBrand);
-  const hasSearched = useStore(searchStore, (s) => s.hasSearched);
-  const userLocation = useStore(searchStore, (s) => s.userLocation);
-  const selectedStation = useStore(searchStore, (s) => s.selectedStation);
-  const sortMode = useStore(searchStore, (s) => s.sortMode);
+async function fetchPredictions(): Promise<PredictionData> {
+  const r = await fetch('/api/previsao');
+  return r.json();
+}
 
-  const [isLocating, setIsLocating] = useState(false);
-  const [locationError, setLocationError] = useState('');
-
-  const setSelectedDistrict = useCallback(
-    (v: string) => searchStore.setState((s) => ({ ...s, selectedDistrict: v })),
-    []
+async function fetchChartData(): Promise<DailyAvg[]> {
+  const results = await Promise.all(
+    CHART_FUELS.map((fuel) => getDailyAverages(fuel, 30))
   );
-  const setSelectedFuel = useCallback(
-    (v: string) => searchStore.setState((s) => ({ ...s, selectedFuel: v })),
-    []
-  );
-  const setSelectedBrand = useCallback(
-    (v: string) => searchStore.setState((s) => ({ ...s, selectedBrand: v })),
-    []
-  );
+  return results.flat().filter(Boolean) as DailyAvg[];
+}
 
+export default function PrevisaoPage() {
+  const [tankSize, setTankSize] = useState(50);
 
-  const { data: brands = [] } = useQuery({
-    queryKey: ['brands'],
-    queryFn: fetchBrands,
+  const {
+    data: avgPrices = {},
+    isLoading: pricesLoading,
+  } = useQuery({
+    queryKey: ['avgPrices'],
+    queryFn: fetchAvgPrices,
   });
 
   const {
-    data: rawStations = [],
-    isLoading: loading,
-    error: searchError,
+    data: predData,
+    isLoading: predLoading,
   } = useQuery({
-    queryKey: ['stations', selectedFuel, selectedDistrict, selectedBrand],
-    queryFn: () => fetchStations({ selectedFuel, selectedDistrict, selectedBrand }),
-    enabled: hasSearched,
+    queryKey: ['predictions'],
+    queryFn: fetchPredictions,
   });
 
-  const stations = useMemo(() => {
-    if (!userLocation || rawStations.length === 0) return rawStations;
-    return [...rawStations]
-      .map((s) => ({
-        ...s,
-        _distance: calculateDistance(
-          userLocation.lat,
-          userLocation.lng,
-          s.Latitude,
-          s.Longitude
-        ),
-      }))
-      .sort(
-        (a: Station & { _distance: number }, b: Station & { _distance: number }) =>
-          a._distance - b._distance
-      )
-      .slice(0, 50);
-  }, [rawStations, userLocation]);
+  const {
+    data: chartRaw = [],
+    isLoading: chartLoading,
+  } = useQuery({
+    queryKey: ['priceChart30d'],
+    queryFn: fetchChartData,
+  });
 
-  const error = searchError?.message || locationError;
+  const loading = pricesLoading || predLoading;
+  const scrapedPredictions = predData?.predictions ?? [];
+  const scrapeError = predData?.error ?? '';
+  const scrapedAt = predData?.scrapedAt ?? '';
 
-  const searchStations = useCallback(() => {
-    setLocationError('');
-    searchStore.setState((s) => ({ ...s, hasSearched: true }));
-  }, []);
+  const predictions = scrapedPredictions.map((sp) => {
+    const priceNum = avgPrices[sp.fuelType] ?? 0;
+    return {
+      fuelType: sp.fuelType,
+      fuelLabel: sp.fuelLabel,
+      currentPrice: priceNum > 0
+        ? `${priceNum.toFixed(3).replace('.', ',')} €/L`
+        : '—',
+      currentPriceNum: priceNum,
+      predictedChange: sp.variationEuro,
+      direction: (sp.trend === 'sobe' ? 'up' : sp.trend === 'desce' ? 'down' : 'stable') as 'up' | 'down' | 'stable',
+      weekRange: sp.week || 'Próxima semana',
+      recommendation: sp.text,
+      source: 'precocombustiveis.pt',
+    };
+  });
 
-  const locateMe = useCallback(() => {
-    if (!navigator.geolocation) {
-      setLocationError('Geolocalização não suportada pelo seu navegador.');
-      return;
-    }
+  const hasPredictions = predictions.length > 0;
 
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
-        setLocationError('');
-        const nearestDistrict = getNearestDistrictId(
-          pos.coords.latitude,
-          pos.coords.longitude
-        );
-        searchStore.setState((s) => ({
-          ...s,
-          selectedDistrict: nearestDistrict,
-          userLocation: {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          },
-          hasSearched: true,
-          sortMode: 'distance',
-        }));
-      },
-      () => {
-        setLocationError(
-          'Não foi possível obter a sua localização. Verifique as permissões.'
-        );
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  }, []);
-
-  const sortedStations = useMemo(() => {
-    if (sortMode === 'distance' && userLocation) {
-      return stations;
-    }
-    return [...stations]
-      .map((s) => {
-        const fuel = s.Combustiveis?.find(
-          (c) => c.TipoCombustivel === FUEL_TYPES[Number(selectedFuel)]
-        );
-        return { ...s, _price: fuel ? parsePrice(fuel.Preco) : Infinity };
+  const lastUpdated = scrapedAt
+    ? new Date(scrapedAt).toLocaleDateString('pt-PT', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
       })
-      .filter((s) => s._price < Infinity)
-      .sort((a, b) => a._price - b._price);
-  }, [stations, selectedFuel, sortMode, userLocation]);
+    : null;
 
-  const handleStationClick = useCallback((station: Station) => {
-    searchStore.setState((s) => ({ ...s, selectedStation: station }));
-  }, []);
+  // Build chart data
+  const chartData = (() => {
+    const dateMap = new Map<string, { date: string; [key: string]: string | number | undefined }>();
+    for (const item of chartRaw) {
+      if (!dateMap.has(item.date)) {
+        dateMap.set(item.date, { date: item.date });
+      }
+      dateMap.get(item.date)![item.fuel_type] = item.avg_price;
+    }
+    return Array.from(dateMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+  })();
 
-  const handleCloseStation = useCallback(() => {
-    searchStore.setState((s) => ({ ...s, selectedStation: null }));
-  }, []);
-
-  const fuelTypeName = FUEL_TYPES[Number(selectedFuel)] || 'Gasóleo simples';
-
-  const [showFilters, setShowFilters] = useState(false);
+  const hasChartData = chartData.length > 0;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-      {/* Prediction Hero */}
-      <PredictionHero />
-
-      {/* Map Section */}
-      <div className="mb-4">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-            Onde abastecer
-          </h2>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="ghost"
-              size="sm"
-            >
-              <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-              Filtros
-            </Button>
-            <Button
-              onClick={locateMe}
-              variant={hasSearched ? 'outline' : 'primary'}
-              size="sm"
-              disabled={isLocating}
-            >
-              <LocateFixed className={`mr-1.5 h-3.5 w-3.5 ${isLocating ? 'animate-pulse' : ''}`} />
-              {isLocating ? 'A localizar...' : 'Perto de mim'}
-            </Button>
-          </div>
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
+          Previsão Semanal
+        </h1>
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-zinc-500">
+          {predictions[0]?.weekRange && (
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              {predictions[0].weekRange}
+            </span>
+          )}
+          {lastUpdated && (
+            <span className="text-xs text-zinc-400">
+              Atualizado: {lastUpdated}
+            </span>
+          )}
         </div>
-
-        {/* Collapsible Filters */}
-        {showFilters && (
-          <Card className="mb-4">
-            <CardContent className="p-4">
-              <SearchFilters
-                selectedDistrict={selectedDistrict}
-                selectedFuel={selectedFuel}
-                selectedBrand={selectedBrand}
-                onDistrictChange={setSelectedDistrict}
-                onFuelChange={setSelectedFuel}
-                onBrandChange={setSelectedBrand}
-                onSearch={searchStations}
-                onLocateMe={locateMe}
-                isLocating={isLocating}
-                brands={brands}
-              />
-            </CardContent>
-          </Card>
-        )}
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="mb-6 flex items-center gap-2 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
-
-      {/* Loading */}
-      {loading && (
+      {loading ? (
         <div className="space-y-4">
-          <Skeleton className="h-[500px] w-full rounded-xl" />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-32 rounded-xl" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className="h-72 rounded-xl" />
             ))}
           </div>
         </div>
-      )}
-
-      {/* Results */}
-      {!loading && hasSearched && stations.length > 0 && (
+      ) : hasPredictions ? (
         <>
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
-              {stations.length} postos
-            </h2>
-            <Badge variant="outline">{getFuelShortName(fuelTypeName)}</Badge>
-            <div className="ml-auto flex gap-1.5">
-              <button
-                onClick={() => searchStore.setState((s) => ({ ...s, sortMode: 'price' }))}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                  sortMode === 'price'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
-                }`}
-              >
-                Preço
-              </button>
-              {userLocation && (
-                <button
-                  onClick={() => searchStore.setState((s) => ({ ...s, sortMode: 'distance' }))}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    sortMode === 'distance'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
-                  }`}
-                >
-                  Distância
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Prediction Cards */}
+          <PriceForecast predictions={predictions} lastUpdated={lastUpdated ?? ''} />
 
-          {/* Map */}
-          <div className="mb-6">
-            <StationMap
-              stations={stations}
-              userLocation={userLocation}
-              selectedFuel={fuelTypeName}
-              selectedStationId={selectedStation?.Id ?? null}
-              onStationClick={handleStationClick}
-            />
-          </div>
-
-          {/* Station list */}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {sortedStations.map((station) => (
-              <StationCard
-                key={station.Id}
-                station={station}
-                userLocation={userLocation}
-                selectedFuel={fuelTypeName}
+          {/* 30-Day Price Chart */}
+          {chartLoading ? (
+            <Skeleton className="mt-6 h-64 rounded-xl" />
+          ) : hasChartData ? (
+            <div className="mt-6">
+              <PriceChart
+                data={chartData}
+                fuelTypes={CHART_FUELS}
+                title="Últimos 30 dias"
+                height={280}
               />
-            ))}
-          </div>
+            </div>
+          ) : (
+            <Card className="mt-6">
+              <CardContent className="py-8 text-center">
+                <p className="text-sm text-zinc-400">
+                  Dados em recolha — o gráfico aparece após alguns dias.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tank Cost Calculator */}
+          {predictions.length > 0 && (
+            <Card className="mt-6">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
+                  <Fuel className="h-4 w-4 text-blue-500" />
+                  Quanto vai custar o meu depósito?
+                </div>
+
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-zinc-500">Tamanho do depósito</span>
+                    <span className="font-bold text-zinc-900 dark:text-white">{tankSize}L</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={10}
+                    max={80}
+                    step={5}
+                    value={tankSize}
+                    onChange={(e) => setTankSize(Number(e.target.value))}
+                    className="mt-2 w-full accent-blue-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-zinc-400">
+                    <span>10L</span>
+                    <span>80L</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {predictions.map((pred) => {
+                    const impact = pred.predictedChange * tankSize;
+                    const isUp = pred.direction === 'up';
+                    const isDown = pred.direction === 'down';
+                    const color = isDown
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : isUp
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-zinc-500';
+
+                    return (
+                      <div key={pred.fuelType} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: getFuelColor(pred.fuelType) }}
+                          />
+                          <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                            {pred.fuelLabel}
+                          </span>
+                        </div>
+                        <span className={`text-lg font-black ${color}`}>
+                          {impact > 0 ? '+' : impact < 0 ? '−' : ''}
+                          {Math.abs(impact).toFixed(2).replace('.', ',')} €
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
-      )}
+      ) : (
+        /* Fallback */
+        <div className="space-y-6">
+          <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+            <CardContent className="flex items-start gap-3 p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Previsão temporariamente indisponível
+                </p>
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                  {scrapeError
+                    ? `Motivo: ${scrapeError}`
+                    : 'Não foi possível obter os dados de previsão.'}
+                  {' '}Consulte as fontes abaixo.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Empty State */}
-      {!loading && hasSearched && stations.length === 0 && !error && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Fuel className="mb-3 h-10 w-10 text-zinc-300" />
-          <p className="text-sm text-zinc-500">
-            Nenhum posto encontrado. Tente alterar os filtros.
-          </p>
+          {Object.keys(avgPrices).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Preços Médios Atuais (DGEG)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {Object.entries(avgPrices)
+                    .filter(([key]) =>
+                      ['Gasóleo simples', 'Gasolina simples 95'].includes(key)
+                    )
+                    .map(([fuel, price]) => (
+                      <div
+                        key={fuel}
+                        className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
+                      >
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">{fuel}</span>
+                        <span className="text-lg font-bold text-zinc-900 dark:text-white">
+                          {price.toFixed(3).replace('.', ',')} €/L
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
-      {/* Initial state — no search yet */}
-      {!loading && !hasSearched && (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <MapPin className="mb-3 h-10 w-10 text-zinc-300" />
-          <p className="text-sm text-zinc-500">
-            Toque em <strong>Perto de mim</strong> para ver os postos mais baratos na sua zona.
-          </p>
+      {/* Accordion: Educational content */}
+      <div className="mt-8 space-y-2">
+        <details className="group rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-blue-500" />
+              Como é formado o preço?
+            </div>
+            <ChevronDown className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
+            <div className="space-y-3">
+              {[
+                { label: 'Cotação internacional (Platts)', pct: 35, color: 'bg-blue-500' },
+                { label: 'ISP + Taxa de Carbono', pct: 30, color: 'bg-red-500' },
+                { label: 'IVA (23%)', pct: 19, color: 'bg-amber-500' },
+                { label: 'Biocombustíveis (13%)', pct: 6, color: 'bg-emerald-500' },
+                { label: 'Margem + logística', pct: 10, color: 'bg-zinc-400' },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div className="mb-1 flex justify-between text-xs">
+                    <span className="text-zinc-600 dark:text-zinc-400">{item.label}</span>
+                    <span className="font-medium text-zinc-900 dark:text-white">~{item.pct}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                    <div
+                      className={`h-full rounded-full ${item.color}`}
+                      style={{ width: `${item.pct}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[10px] text-zinc-400">
+              ~55% do preço final são impostos (ISP + IVA)
+            </p>
+          </div>
+        </details>
+
+        <details className="group rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-zinc-400" />
+              Como funciona a previsão?
+            </div>
+            <ChevronDown className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
+            <p className="text-xs text-zinc-500">
+              Em Portugal, os preços dos combustíveis atualizam às segundas-feiras.
+              A previsão baseia-se nas cotações internacionais Platts, no câmbio EUR/USD,
+              no preço do Brent, e nos impostos (ISP + IVA a 23%). A ENSE publica
+              diariamente preços de referência. Cada posto define livremente o seu preço final.
+            </p>
+          </div>
+        </details>
+      </div>
+
+      {/* External sources */}
+      <div className="mt-8">
+        <h2 className="mb-4 text-sm font-bold text-zinc-700 dark:text-zinc-300">
+          Fontes
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[
+            {
+              name: 'Contas Poupança',
+              url: 'https://contaspoupanca.pt/carro/combustiveis/',
+              desc: 'Previsões semanais detalhadas',
+            },
+            {
+              name: 'precoCombustiveis.pt',
+              url: 'https://precocombustiveis.pt/proxima-semana/',
+              desc: 'Fonte automática da previsão',
+            },
+            {
+              name: 'ENSE',
+              url: 'https://www.ense-epe.pt/precos-de-referencia/',
+              desc: 'Preços de referência diários',
+            },
+            {
+              name: 'DGEG',
+              url: 'https://precoscombustiveis.dgeg.gov.pt/estatistica/preco-medio-diario/',
+              desc: 'Preço médio diário oficial',
+            },
+          ].map((source) => (
+            <a
+              key={source.name}
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+            >
+              <div className="flex-1">
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                  {source.name}
+                </p>
+                <p className="text-xs text-zinc-500">{source.desc}</p>
+              </div>
+              <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />
+            </a>
+          ))}
         </div>
-      )}
-      <StationDrawer station={selectedStation} onClose={handleCloseStation} />
+      </div>
     </div>
   );
 }

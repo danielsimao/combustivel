@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 import { Fuel, Map, TrendingUp, BarChart3 } from 'lucide-react';
 
 const navigation = [
-  { name: 'Mapa', href: '/', icon: Map },
-  { name: 'Previsão', href: '/previsao', icon: TrendingUp },
+  { name: 'Previsão', href: '/', icon: TrendingUp },
+  { name: 'Mapa', href: '/mapa', icon: Map },
   { name: 'Estatísticas', href: '/estatisticas', icon: BarChart3 },
 ];
 
