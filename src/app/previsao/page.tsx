@@ -9,7 +9,6 @@ import {
   Lightbulb,
   BarChart3,
   AlertTriangle,
-  Globe,
   AlertCircle,
   Calendar,
 } from 'lucide-react';
@@ -20,34 +19,6 @@ interface PredictionData {
   scrapedAt: string;
   source: string;
   error?: string;
-}
-
-function getRecommendation(trend: string, fuelLabel: string): string {
-  if (trend === 'sobe') {
-    return `Abasteça antes de segunda-feira! O ${fuelLabel.toLowerCase()} deverá subir.`;
-  }
-  if (trend === 'desce') {
-    return `Pode esperar para abastecer. O ${fuelLabel.toLowerCase()} deverá descer.`;
-  }
-  return `Sem alteração significativa prevista para o ${fuelLabel.toLowerCase()}.`;
-}
-
-function getFactors(trend: string): string[] {
-  if (trend === 'sobe') {
-    return [
-      'Cotações internacionais em alta',
-      'Possível pressão do câmbio EUR/USD',
-      'Tensões geopolíticas mantêm pressão no crude',
-    ];
-  }
-  if (trend === 'desce') {
-    return [
-      'Cotações internacionais em queda',
-      'Possível alívio nas cotações Platts',
-      'Tendência de correção nos mercados',
-    ];
-  }
-  return ['Mercado estável', 'Sem variação significativa nas cotações internacionais'];
 }
 
 async function fetchAvgPrices(): Promise<Record<string, number>> {
@@ -105,9 +76,8 @@ export default function PrevisaoPage() {
       predictedChange: sp.variationEuro,
       direction: (sp.trend === 'sobe' ? 'up' : sp.trend === 'desce' ? 'down' : 'stable') as 'up' | 'down' | 'stable',
       weekRange: sp.week || 'Próxima semana',
-      recommendation: getRecommendation(sp.trend, sp.fuelLabel),
+      recommendation: sp.text,
       source: 'precocombustiveis.pt',
-      factors: getFactors(sp.trend),
     };
   });
 
@@ -122,9 +92,6 @@ export default function PrevisaoPage() {
         minute: '2-digit',
       })
     : null;
-
-  // Collect all unique factors
-  const allFactors = [...new Set(predictions.flatMap((p) => p.factors))];
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
@@ -159,26 +126,6 @@ export default function PrevisaoPage() {
       ) : hasPredictions ? (
         <>
           <PriceForecast predictions={predictions} lastUpdated={lastUpdated ?? ''} />
-
-          {/* Market Context */}
-          {allFactors.length > 0 && (
-            <Card className="mt-6 overflow-hidden border-l-[6px] border-l-amber-400 bg-amber-50/30 dark:bg-amber-950/10">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
-                  <Globe className="h-4 w-4 text-amber-500" />
-                  Contexto de Mercado
-                </div>
-                <ul className="mt-3 space-y-2">
-                  {allFactors.map((factor, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
-                      {factor}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
 
           {/* How the prediction works */}
           <Card className="mt-6 overflow-hidden border-l-[6px] border-l-zinc-300 dark:border-l-zinc-600">

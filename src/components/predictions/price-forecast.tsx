@@ -21,7 +21,6 @@ interface PredictionData {
   weekRange: string;
   recommendation: string;
   source: string;
-  factors: string[];
 }
 
 interface PriceForecastProps {
