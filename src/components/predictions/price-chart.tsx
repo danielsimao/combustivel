@@ -78,6 +78,11 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
                 borderRadius: '8px',
                 fontSize: '12px',
               }}
+              labelStyle={{ color: '#18181b', fontWeight: 600, marginBottom: 4 }}
+              labelFormatter={(v) => {
+                const [, m, d] = String(v).split('-');
+                return `${parseInt(d)}/${parseInt(m)}`;
+              }}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               formatter={(value: any, name: any) => [
                 `${Number(value).toFixed(3)} €/L`,
