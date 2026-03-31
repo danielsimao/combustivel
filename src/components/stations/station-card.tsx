@@ -30,7 +30,7 @@ export function StationCard({ station, userLocation, selectedFuel, rank }: Stati
 
   return (
     <div onClick={() => searchStore.setState((s) => ({ ...s, selectedStation: station }))}>
-      <Card className="transition-all hover:shadow-md hover:border-blue-200 cursor-pointer">
+      <Card className="overflow-hidden transition-all hover:shadow-md hover:border-blue-200 cursor-pointer">
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">

@@ -213,7 +213,7 @@ export default function MapaPage() {
   const fuelTypeName = FUEL_TYPES[Number(selectedFuel)] || 'Gasóleo simples';
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+    <div className="mx-auto max-w-7xl overflow-hidden px-4 py-6 sm:px-6">
       {/* Controls */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex gap-2">
@@ -266,7 +266,7 @@ export default function MapaPage() {
       {loading && (
         <div className="space-y-4">
           <Skeleton className="h-[500px] w-full rounded-xl" />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-32 rounded-xl" />
             ))}
@@ -317,7 +317,7 @@ export default function MapaPage() {
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {sortedStations.map((station) => (
               <StationCard
                 key={station.Id}
