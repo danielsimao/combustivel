@@ -33,11 +33,23 @@ export async function getDailyAverages(fuelType: string, days: number = 90) {
 export async function getLatestPredictions() {
   if (!supabase) return [];
 
+  // Get the most recent week_start, then fetch only those rows
+  const { data: latest, error: latestErr } = await supabase
+    .from('price_predictions')
+    .select('week_start')
+    .order('week_start', { ascending: false })
+    .limit(1);
+
+  if (latestErr || !latest || latest.length === 0) {
+    if (latestErr) console.error('Error fetching predictions:', latestErr);
+    return [];
+  }
+
   const { data, error } = await supabase
     .from('price_predictions')
     .select('*')
-    .order('created_at', { ascending: false })
-    .limit(10);
+    .eq('week_start', latest[0].week_start)
+    .order('fuel_type', { ascending: true });
 
   if (error) {
     console.error('Error fetching predictions:', error);
