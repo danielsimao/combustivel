@@ -213,7 +213,7 @@ export default function MapaPage() {
   const fuelTypeName = FUEL_TYPES[Number(selectedFuel)] || 'Gasóleo simples';
 
   return (
-    <div className="mx-auto max-w-7xl overflow-hidden px-4 py-6 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       {/* Controls */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex gap-2">
