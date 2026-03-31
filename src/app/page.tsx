@@ -18,6 +18,7 @@ import {
 import { FuelPrediction } from '@/lib/scrape-predictions';
 import { getDailyAverages } from '@/lib/supabase';
 import { getFuelColor } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 
 interface PredictionData {
   predictions: FuelPrediction[];
@@ -64,6 +65,7 @@ async function fetchChartData(): Promise<DailyAvg[]> {
 
 export default function PrevisaoPage() {
   const [tankSize, setTankSize] = useState(50);
+  const { t } = useTranslation();
 
   const {
     data: avgPrices = {},
@@ -105,7 +107,7 @@ export default function PrevisaoPage() {
       currentPriceNum: priceNum,
       predictedChange: sp.variationEuro,
       direction: (sp.trend === 'sobe' ? 'up' : sp.trend === 'desce' ? 'down' : 'stable') as 'up' | 'down' | 'stable',
-      weekRange: sp.week || 'Próxima semana',
+      weekRange: sp.week || t('forecast.nextWeek'),
       recommendation: sp.text,
       source: 'precocombustiveis.pt',
     };
@@ -144,7 +146,7 @@ export default function PrevisaoPage() {
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
-          Previsão Semanal
+          {t('forecast.title')}
         </h1>
         <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-zinc-500">
           {predictions[0]?.weekRange && (
@@ -155,7 +157,7 @@ export default function PrevisaoPage() {
           )}
           {lastUpdated && (
             <span className="text-xs text-zinc-400">
-              Atualizado: {lastUpdated}
+              {t('forecast.updated', { time: lastUpdated })}
             </span>
           )}
         </div>
@@ -182,7 +184,7 @@ export default function PrevisaoPage() {
               <PriceChart
                 data={chartData}
                 fuelTypes={CHART_FUELS}
-                title="Últimos 30 dias"
+                title={t('forecast.chart.last30')}
                 height={280}
               />
             </div>
@@ -190,7 +192,7 @@ export default function PrevisaoPage() {
             <Card className="mt-6">
               <CardContent className="py-8 text-center">
                 <p className="text-sm text-zinc-400">
-                  Dados em recolha — o gráfico aparece após alguns dias.
+                  {t('forecast.chart.collecting')}
                 </p>
               </CardContent>
             </Card>
@@ -202,12 +204,12 @@ export default function PrevisaoPage() {
               <CardContent className="p-5">
                 <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
                   <Fuel className="h-4 w-4 text-blue-500" />
-                  Quanto vai custar o meu depósito?
+                  {t('forecast.calculator.title')}
                 </div>
 
                 <div className="mt-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-zinc-500">Tamanho do depósito</span>
+                    <span className="text-zinc-500">{t('forecast.calculator.tankSize')}</span>
                     <span className="font-bold text-zinc-900 dark:text-white">{tankSize}L</span>
                   </div>
                   <input
@@ -267,13 +269,13 @@ export default function PrevisaoPage() {
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div>
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                  Previsão temporariamente indisponível
+                  {t('forecast.unavailable')}
                 </p>
                 <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                   {scrapeError
-                    ? `Motivo: ${scrapeError}`
-                    : 'Não foi possível obter os dados de previsão.'}
-                  {' '}Consulte as fontes abaixo.
+                    ? t('forecast.unavailableReason', { error: scrapeError })
+                    : t('forecast.unavailableGeneric')}
+                  {' '}{t('forecast.checkSources')}
                 </p>
               </div>
             </CardContent>
@@ -282,7 +284,7 @@ export default function PrevisaoPage() {
           {Object.keys(avgPrices).length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Preços Médios Atuais (DGEG)</CardTitle>
+                <CardTitle className="text-base">{t('forecast.currentPrices')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -314,18 +316,18 @@ export default function PrevisaoPage() {
           <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-blue-500" />
-              Como é formado o preço?
+              {t('forecast.priceBreakdown.title')}
             </div>
             <ChevronDown className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180" />
           </summary>
           <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
             <div className="space-y-3">
               {[
-                { label: 'Cotação internacional (Platts)', pct: 35, color: 'bg-blue-500' },
-                { label: 'ISP + Taxa de Carbono', pct: 30, color: 'bg-red-500' },
-                { label: 'IVA (23%)', pct: 19, color: 'bg-amber-500' },
-                { label: 'Biocombustíveis (13%)', pct: 6, color: 'bg-emerald-500' },
-                { label: 'Margem + logística', pct: 10, color: 'bg-zinc-400' },
+                { label: t('forecast.priceBreakdown.platts'), pct: 35, color: 'bg-blue-500' },
+                { label: t('forecast.priceBreakdown.isp'), pct: 30, color: 'bg-red-500' },
+                { label: t('forecast.priceBreakdown.vat'), pct: 19, color: 'bg-amber-500' },
+                { label: t('forecast.priceBreakdown.biofuels'), pct: 6, color: 'bg-emerald-500' },
+                { label: t('forecast.priceBreakdown.margin'), pct: 10, color: 'bg-zinc-400' },
               ].map((item) => (
                 <div key={item.label}>
                   <div className="mb-1 flex justify-between text-xs">
@@ -342,7 +344,7 @@ export default function PrevisaoPage() {
               ))}
             </div>
             <p className="mt-3 text-[10px] text-zinc-400">
-              ~55% do preço final são impostos (ISP + IVA)
+              {t('forecast.priceBreakdown.taxNote')}
             </p>
           </div>
         </details>
@@ -351,16 +353,13 @@ export default function PrevisaoPage() {
           <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-zinc-400" />
-              Como funciona a previsão?
+              {t('forecast.methodology.title')}
             </div>
             <ChevronDown className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180" />
           </summary>
           <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
             <p className="text-xs text-zinc-500">
-              Em Portugal, os preços dos combustíveis atualizam às segundas-feiras.
-              A previsão baseia-se nas cotações internacionais Platts, no câmbio EUR/USD,
-              no preço do Brent, e nos impostos (ISP + IVA a 23%). A ENSE publica
-              diariamente preços de referência. Cada posto define livremente o seu preço final.
+              {t('forecast.methodology.text')}
             </p>
           </div>
         </details>
@@ -369,29 +368,29 @@ export default function PrevisaoPage() {
       {/* External sources */}
       <div className="mt-8">
         <h2 className="mb-4 text-sm font-bold text-zinc-700 dark:text-zinc-300">
-          Fontes
+          {t('forecast.sources.title')}
         </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {[
             {
               name: 'Contas Poupança',
               url: 'https://contaspoupanca.pt/carro/combustiveis/',
-              desc: 'Previsões semanais detalhadas',
+              desc: t('forecast.sources.contasPoupanca'),
             },
             {
               name: 'precoCombustiveis.pt',
               url: 'https://precocombustiveis.pt/proxima-semana/',
-              desc: 'Fonte automática da previsão',
+              desc: t('forecast.sources.precoCombustiveis'),
             },
             {
               name: 'ENSE',
               url: 'https://www.ense-epe.pt/precos-de-referencia/',
-              desc: 'Preços de referência diários',
+              desc: t('forecast.sources.ense'),
             },
             {
               name: 'DGEG',
               url: 'https://precoscombustiveis.dgeg.gov.pt/estatistica/preco-medio-diario/',
-              desc: 'Preço médio diário oficial',
+              desc: t('forecast.sources.dgeg'),
             },
           ].map((source) => (
             <a

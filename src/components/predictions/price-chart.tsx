@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getFuelColor, getFuelShortName } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 
 interface ChartData {
   date: string;
@@ -27,6 +28,8 @@ interface PriceChartProps {
 }
 
 export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartProps) {
+  const { t } = useTranslation();
+
   if (!data || data.length === 0) {
     return (
       <Card>
@@ -35,7 +38,7 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
         </CardHeader>
         <CardContent>
           <div className="flex h-[200px] items-center justify-center text-sm text-zinc-500">
-            Sem dados disponíveis. Os dados serão recolhidos diariamente.
+            {t('forecast.chart.noData')}
           </div>
         </CardContent>
       </Card>

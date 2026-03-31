@@ -3,16 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 import { Fuel, Map, TrendingUp, BarChart3 } from 'lucide-react';
-
-const navigation = [
-  { name: 'Previsão', href: '/', icon: TrendingUp },
-  { name: 'Mapa', href: '/mapa', icon: Map },
-  { name: 'Estatísticas', href: '/estatisticas', icon: BarChart3 },
-];
 
 export function Header() {
   const pathname = usePathname();
+  const { t } = useTranslation();
+
+  const navigation = [
+    { name: t('nav.forecast'), href: '/', icon: TrendingUp },
+    { name: t('nav.map'), href: '/mapa', icon: Map },
+    { name: t('nav.statistics'), href: '/estatisticas', icon: BarChart3 },
+  ];
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-lg dark:border-zinc-800 dark:bg-zinc-950/80">
@@ -23,10 +25,10 @@ export function Header() {
           </div>
           <div className="flex flex-col">
             <span className="text-base font-bold leading-tight text-zinc-900 dark:text-white">
-              Combustível
+              {t('header.title')}
             </span>
             <span className="text-[10px] leading-tight text-zinc-500">
-              Preços em Portugal
+              {t('header.subtitle')}
             </span>
           </div>
         </Link>

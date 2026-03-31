@@ -3,16 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 import { Map, TrendingUp, BarChart3 } from 'lucide-react';
-
-const tabs = [
-  { name: 'Previsão', href: '/', icon: TrendingUp },
-  { name: 'Mapa', href: '/mapa', icon: Map },
-  { name: 'Estatísticas', href: '/estatisticas', icon: BarChart3 },
-];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { t } = useTranslation();
+
+  const tabs = [
+    { name: t('nav.forecast'), href: '/', icon: TrendingUp },
+    { name: t('nav.map'), href: '/mapa', icon: Map },
+    { name: t('nav.statistics'), href: '/estatisticas', icon: BarChart3 },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-200 bg-white/80 backdrop-blur-lg dark:border-zinc-800 dark:bg-zinc-950/80 md:hidden">

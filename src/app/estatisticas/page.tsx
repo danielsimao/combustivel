@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/select';
 import { TrendingUp, TrendingDown, Minus, Database, ExternalLink } from 'lucide-react';
 import { getDailyAverages } from '@/lib/supabase';
 import { getFuelShortName, getFuelColor } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 
 interface DailyAvg {
   date: string;
@@ -31,6 +32,7 @@ async function fetchFuelData(selectedFuels: string[], timeRange: number): Promis
 }
 
 export default function EstatisticasPage() {
+  const { t } = useTranslation();
   const [timeRange, setTimeRange] = useState(90);
   const [selectedFuels, setSelectedFuels] = useState<string[]>([
     'Gasóleo simples',
@@ -70,10 +72,10 @@ export default function EstatisticasPage() {
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
       <div className="mb-8">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-          Estatísticas de Preços
+          {t('stats.title')}
         </h1>
         <p className="mt-2 text-sm text-zinc-500">
-          Evolução histórica dos preços médios dos combustíveis em Portugal.
+          {t('stats.subtitle')}
         </p>
       </div>
 
@@ -83,21 +85,21 @@ export default function EstatisticasPage() {
           <div className="flex flex-wrap items-end gap-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">
-                Período
+                {t('stats.period')}
               </label>
               <Select
                 value={String(timeRange)}
                 onChange={(e) => setTimeRange(Number(e.target.value))}
               >
-                <option value="30">Últimos 30 dias</option>
-                <option value="90">Últimos 3 meses</option>
-                <option value="180">Últimos 6 meses</option>
-                <option value="365">Último ano</option>
+                <option value="30">{t('stats.last30')}</option>
+                <option value="90">{t('stats.last90')}</option>
+                <option value="180">{t('stats.last180')}</option>
+                <option value="365">{t('stats.last365')}</option>
               </Select>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-zinc-600">
-                Combustíveis
+                {t('stats.fuels')}
               </label>
               <div className="flex flex-wrap gap-2">
                 {FUEL_OPTIONS.map((fuel) => (
@@ -131,7 +133,7 @@ export default function EstatisticasPage() {
           <PriceChart
             data={chartData}
             fuelTypes={selectedFuels}
-            title={`Evolução de preços - Últimos ${timeRange} dias`}
+            title={t('stats.chartTitle', { days: timeRange })}
             height={400}
           />
 
@@ -202,27 +204,26 @@ export default function EstatisticasPage() {
           <CardContent className="text-center">
             <Database className="mx-auto mb-4 h-12 w-12 text-zinc-300" />
             <h3 className="text-lg font-semibold text-zinc-700 dark:text-zinc-300">
-              Dados históricos em construção
+              {t('stats.emptyTitle')}
             </h3>
             <p className="mx-auto mt-2 max-w-md text-sm text-zinc-500">
-              Os dados históricos são recolhidos diariamente de forma automática.
-              Configure o Supabase e aguarde a recolha de dados para ver os gráficos.
+              {t('stats.emptyText')}
             </p>
             <div className="mx-auto mt-6 max-w-lg rounded-lg bg-zinc-50 p-4 text-left dark:bg-zinc-900">
               <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                Para configurar:
+                {t('stats.setupTitle')}
               </p>
               <ol className="mt-2 space-y-1 text-xs text-zinc-500">
-                <li>1. Crie uma conta no Supabase (gratuito)</li>
-                <li>2. Execute o SQL de criação de tabelas (ver /sobre)</li>
-                <li>3. Adicione as variáveis de ambiente no Vercel</li>
-                <li>4. O cron job recolhe dados automaticamente às 20h</li>
+                <li>{t('stats.setup1')}</li>
+                <li>{t('stats.setup2')}</li>
+                <li>{t('stats.setup3')}</li>
+                <li>{t('stats.setup4')}</li>
               </ol>
             </div>
 
             <div className="mt-6">
               <p className="mb-2 text-xs font-medium text-zinc-500">
-                Enquanto isso, consulte as fontes oficiais:
+                {t('stats.checkSources')}
               </p>
               <div className="flex flex-wrap justify-center gap-2">
                 <a
@@ -231,7 +232,7 @@ export default function EstatisticasPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
                 >
-                  DGEG - Preço Médio Diário
+                  {t('stats.dgegLink')}
                   <ExternalLink className="h-3 w-3" />
                 </a>
                 <a
@@ -240,7 +241,7 @@ export default function EstatisticasPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
                 >
-                  ENSE - Preços de Referência
+                  {t('stats.enseLink')}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>

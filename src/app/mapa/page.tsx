@@ -27,6 +27,7 @@ import {
   SlidersHorizontal,
   LocateFixed,
 } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n';
 
 async function fetchBrands(): Promise<Brand[]> {
   const r = await fetch('/api/dgeg/marcas');
@@ -96,6 +97,7 @@ export default function MapaPage() {
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const { t } = useTranslation();
 
   const setSelectedDistrict = useCallback(
     (v: string) => searchStore.setState((s) => ({ ...s, selectedDistrict: v })),
@@ -153,7 +155,7 @@ export default function MapaPage() {
 
   const locateMe = useCallback(() => {
     if (!navigator.geolocation) {
-      setLocationError('Geolocalização não suportada pelo seu navegador.');
+      setLocationError(t('map.geoNotSupported'));
       return;
     }
 
@@ -179,7 +181,7 @@ export default function MapaPage() {
       },
       () => {
         setLocationError(
-          'Não foi possível obter a sua localização. Verifique as permissões.'
+          t('map.geoFailed')
         );
         setIsLocating(false);
       },
@@ -225,7 +227,7 @@ export default function MapaPage() {
             size="sm"
           >
             <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-            Filtros
+            {t('map.filters')}
           </Button>
           <Button
             onClick={locateMe}
@@ -234,7 +236,7 @@ export default function MapaPage() {
             disabled={isLocating}
           >
             <LocateFixed className={`mr-1.5 h-3.5 w-3.5 ${isLocating ? 'animate-pulse' : ''}`} />
-            {isLocating ? 'A localizar...' : 'Perto de mim'}
+            {isLocating ? t('map.locating') : t('map.nearMe')}
           </Button>
         </div>
       </div>
@@ -280,7 +282,7 @@ export default function MapaPage() {
         <>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
-              {stations.length} postos
+              {t('map.stations', { count: stations.length })}
             </h2>
             <Badge variant="outline">{getFuelShortName(fuelTypeName)}</Badge>
             <div className="ml-auto flex gap-1.5">
@@ -292,7 +294,7 @@ export default function MapaPage() {
                     : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
                 }`}
               >
-                Preço
+                {t('map.price')}
               </button>
               {userLocation && (
                 <button
@@ -303,7 +305,7 @@ export default function MapaPage() {
                       : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'
                   }`}
                 >
-                  Distância
+                  {t('map.distance')}
                 </button>
               )}
             </div>
@@ -336,7 +338,7 @@ export default function MapaPage() {
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Fuel className="mb-3 h-10 w-10 text-zinc-300" />
           <p className="text-sm text-zinc-500">
-            Nenhum posto encontrado. Tente alterar os filtros.
+            {t('map.noResults')}
           </p>
         </div>
       )}
@@ -344,9 +346,10 @@ export default function MapaPage() {
       {!loading && !hasSearched && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <MapPin className="mb-3 h-10 w-10 text-zinc-300" />
-          <p className="text-sm text-zinc-500">
-            Toque em <strong>Perto de mim</strong> para ver os postos mais baratos na sua zona.
-          </p>
+          <p
+            className="text-sm text-zinc-500"
+            dangerouslySetInnerHTML={{ __html: t('map.tapNearMe') }}
+          />
         </div>
       )}
 

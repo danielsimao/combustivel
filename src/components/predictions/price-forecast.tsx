@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from '@/lib/i18n';
 import {
   TrendingUp,
   TrendingDown,
@@ -37,6 +38,8 @@ function formatEuro(value: number): string {
 }
 
 export function PriceForecast({ predictions, lastUpdated }: PriceForecastProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-6">
       {/* Prediction Cards */}
@@ -65,7 +68,7 @@ export function PriceForecast({ predictions, lastUpdated }: PriceForecastProps) 
             : isUp
             ? TrendingUp
             : Minus;
-          const directionWord = isDown ? 'Desce' : isUp ? 'Sobe' : 'Estável';
+          const directionWord = isDown ? t('forecast.drops') : isUp ? t('forecast.rises') : t('forecast.stable');
 
           const estimatedPrice = pred.currentPriceNum > 0
             ? (pred.currentPriceNum + pred.predictedChange).toFixed(3).replace('.', ',')
@@ -130,7 +133,7 @@ export function PriceForecast({ predictions, lastUpdated }: PriceForecastProps) 
                 <div className="mt-4 border-t border-zinc-200/60 pt-3 dark:border-zinc-700/30">
                   <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
                     <Fuel className="h-3 w-3" />
-                    Impacto no depósito
+                    {t('forecast.tankImpact')}
                   </div>
                   <div className="mt-2 flex gap-3">
                     {TANK_SIZES.map((size) => {
@@ -149,7 +152,7 @@ export function PriceForecast({ predictions, lastUpdated }: PriceForecastProps) 
 
                 {/* Source */}
                 <p className="mt-3 text-[10px] text-zinc-400">
-                  Fonte: {pred.source}
+                  {t('forecast.source', { source: pred.source })}
                 </p>
               </CardContent>
             </Card>

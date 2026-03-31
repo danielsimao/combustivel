@@ -1,0 +1,118 @@
+{
+  "nav": {
+    "forecast": "Forecast",
+    "map": "Map",
+    "statistics": "Statistics"
+  },
+  "header": {
+    "title": "Combustível",
+    "subtitle": "Fuel Prices in Portugal"
+  },
+  "footer": {
+    "dataBy": "Data provided by",
+    "and": "and",
+    "nonCommercial": "Non-commercial use.",
+    "disclaimer": "Only stations reporting prices to DGEG. Some stations may not appear."
+  },
+  "forecast": {
+    "title": "Weekly Forecast",
+    "updated": "Updated: {time}",
+    "nextWeek": "Next week",
+    "rises": "Rises",
+    "drops": "Drops",
+    "stable": "Stable",
+    "tankImpact": "Tank impact",
+    "source": "Source: {source}",
+    "unavailable": "Forecast temporarily unavailable",
+    "unavailableReason": "Reason: {error}",
+    "unavailableGeneric": "Unable to retrieve forecast data.",
+    "checkSources": "Check the sources below.",
+    "currentPrices": "Current Average Prices (DGEG)",
+    "calculator": {
+      "title": "How much will my tank cost?",
+      "tankSize": "Tank size"
+    },
+    "chart": {
+      "collecting": "Collecting data — chart will appear after a few days.",
+      "last30": "Last 30 days",
+      "noData": "No data available. Data is collected daily."
+    },
+    "priceBreakdown": {
+      "title": "How is the price formed?",
+      "platts": "International quotation (Platts)",
+      "isp": "ISP + Carbon Tax",
+      "vat": "VAT (23%)",
+      "biofuels": "Biofuels (13%)",
+      "margin": "Margin + logistics",
+      "taxNote": "~55% of the final price are taxes (ISP + VAT)"
+    },
+    "methodology": {
+      "title": "How does the forecast work?",
+      "text": "In Portugal, fuel prices update on Mondays. The forecast is based on Platts international quotations, EUR/USD exchange rate, Brent price, and taxes (ISP + VAT at 23%). ENSE publishes daily reference prices. Each station freely sets its final price."
+    },
+    "sources": {
+      "title": "Sources",
+      "contasPoupanca": "Detailed weekly forecasts",
+      "precoCombustiveis": "Automatic forecast source",
+      "ense": "Daily reference prices",
+      "dgeg": "Official daily average price"
+    }
+  },
+  "map": {
+    "filters": "Filters",
+    "locating": "Locating...",
+    "nearMe": "Near me",
+    "geoNotSupported": "Geolocation is not supported by your browser.",
+    "geoFailed": "Unable to get your location. Check permissions.",
+    "stations": "{count} stations",
+    "price": "Price",
+    "distance": "Distance",
+    "noResults": "No stations found. Try changing the filters.",
+    "tapNearMe": "Tap <strong>Near me</strong> to see the cheapest stations in your area.",
+    "search": "Search",
+    "fuel": "Fuel",
+    "district": "District",
+    "allDistricts": "All districts",
+    "brand": "Brand",
+    "allBrands": "All brands"
+  },
+  "stats": {
+    "title": "Price Statistics",
+    "subtitle": "Historical evolution of average fuel prices in Portugal.",
+    "period": "Period",
+    "last30": "Last 30 days",
+    "last90": "Last 3 months",
+    "last180": "Last 6 months",
+    "last365": "Last year",
+    "fuels": "Fuels",
+    "chartTitle": "Price evolution - Last {days} days",
+    "emptyTitle": "Historical data in progress",
+    "emptyText": "Historical data is collected daily and automatically. Configure Supabase and wait for data collection to see the charts.",
+    "setupTitle": "To configure:",
+    "setup1": "1. Create a Supabase account (free)",
+    "setup2": "2. Run the SQL to create tables (see /about)",
+    "setup3": "3. Add environment variables in Vercel",
+    "setup4": "4. The cron job collects data automatically at 8pm",
+    "checkSources": "In the meantime, check the official sources:",
+    "dgegLink": "DGEG - Daily Average Price",
+    "enseLink": "ENSE - Reference Prices"
+  },
+  "station": {
+    "prices": "Prices",
+    "noPrices": "No prices available.",
+    "directions": "Directions on Google Maps",
+    "hours": "Hours",
+    "weekdays": "Weekdays",
+    "saturday": "Saturday",
+    "sunday": "Sunday",
+    "holiday": "Holiday",
+    "payment": "Payment",
+    "updated": "Updated: {date}",
+    "details": "Station details"
+  },
+  "hero": {
+    "fillUp": "Fill up before Monday!",
+    "wait": "You can wait — price will drop.",
+    "stableAdvice": "Price is stable — fill up whenever."
+  }
+}

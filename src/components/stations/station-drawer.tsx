@@ -10,6 +10,7 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer';
+import { useTranslation } from '@/lib/i18n';
 import { X } from 'lucide-react';
 
 interface StationDrawerProps {
@@ -34,6 +35,7 @@ function useIsDesktop() {
 export function StationDrawer({ station, onClose }: StationDrawerProps) {
   const isOpen = station !== null;
   const isDesktop = useIsDesktop();
+  const { t } = useTranslation();
 
   if (!isOpen) return null;
 
@@ -51,7 +53,7 @@ export function StationDrawer({ station, onClose }: StationDrawerProps) {
             className="fixed right-0 top-16 bottom-0 z-50 flex w-[400px] flex-col border-l border-zinc-200 bg-white shadow-xl outline-none dark:border-zinc-800 dark:bg-zinc-950"
           >
             <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
-              <span className="text-sm font-medium text-zinc-500">Detalhes do posto</span>
+              <span className="text-sm font-medium text-zinc-500">{t('station.details')}</span>
               <button
                 onClick={onClose}
                 className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getFuelShortName, getFuelColor, formatDateTime } from '@/lib/utils';
+import { useTranslation } from '@/lib/i18n';
 import { MapPin, Navigation, Clock, CreditCard, Fuel } from 'lucide-react';
 
 interface StationDetailData {
@@ -46,6 +47,7 @@ interface StationDetailProps {
 }
 
 export function StationDetail({ station }: StationDetailProps) {
+  const { t } = useTranslation();
   const { data: detail, isLoading } = useQuery({
     queryKey: ['station-detail', station.Id],
     queryFn: () => fetchStationDetail(station.Id),
@@ -98,7 +100,7 @@ export function StationDetail({ station }: StationDetailProps) {
           className="w-full"
         >
           <Navigation className="mr-2 h-4 w-4" />
-          Direções no Google Maps
+          {t('station.directions')}
         </Button>
       )}
 
@@ -106,7 +108,7 @@ export function StationDetail({ station }: StationDetailProps) {
       <div>
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
           <Fuel className="h-4 w-4 text-blue-600" />
-          Preços
+          {t('station.prices')}
         </h3>
         {fuels.length > 0 ? (
           <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -131,7 +133,7 @@ export function StationDetail({ station }: StationDetailProps) {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-zinc-500">Sem preços disponíveis.</p>
+          <p className="text-sm text-zinc-500">{t('station.noPrices')}</p>
         )}
       </div>
 
@@ -142,14 +144,14 @@ export function StationDetail({ station }: StationDetailProps) {
         <div>
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             <Clock className="h-4 w-4 text-blue-600" />
-            Horário
+            {t('station.hours')}
           </h3>
           <div className="space-y-1 text-sm">
             {[
-              { label: 'Dias úteis', value: detail.HorarioPosto.DiasUteis },
-              { label: 'Sábado', value: detail.HorarioPosto.Sabado },
-              { label: 'Domingo', value: detail.HorarioPosto.Domingo },
-              { label: 'Feriado', value: detail.HorarioPosto.Feriado },
+              { label: t('station.weekdays'), value: detail.HorarioPosto.DiasUteis },
+              { label: t('station.saturday'), value: detail.HorarioPosto.Sabado },
+              { label: t('station.sunday'), value: detail.HorarioPosto.Domingo },
+              { label: t('station.holiday'), value: detail.HorarioPosto.Feriado },
             ].map((row) => (
               <div key={row.label} className="flex justify-between">
                 <span className="text-zinc-500">{row.label}</span>
@@ -169,7 +171,7 @@ export function StationDetail({ station }: StationDetailProps) {
         <div>
           <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300">
             <CreditCard className="h-4 w-4 text-blue-600" />
-            Pagamento
+            {t('station.payment')}
           </h3>
           <div className="flex flex-wrap gap-1.5">
             {detail.MeiosPagamento.map((m) => (
@@ -184,7 +186,7 @@ export function StationDetail({ station }: StationDetailProps) {
       {/* Last updated */}
       {detail?.DataAtualizacao && (
         <p className="text-xs text-zinc-400">
-          Atualizado: {detail.DataAtualizacao}
+          {t('station.updated', { date: detail.DataAtualizacao })}
         </p>
       )}
     </div>

@@ -1,0 +1,118 @@
+{
+  "nav": {
+    "forecast": "Previsão",
+    "map": "Mapa",
+    "statistics": "Estatísticas"
+  },
+  "header": {
+    "title": "Combustível",
+    "subtitle": "Preços em Portugal"
+  },
+  "footer": {
+    "dataBy": "Dados fornecidos pela",
+    "and": "e",
+    "nonCommercial": "Uso não comercial.",
+    "disclaimer": "Apenas postos que comunicam preços à DGEG. Alguns postos podem não aparecer."
+  },
+  "forecast": {
+    "title": "Previsão Semanal",
+    "updated": "Atualizado: {time}",
+    "nextWeek": "Próxima semana",
+    "rises": "Sobe",
+    "drops": "Desce",
+    "stable": "Estável",
+    "tankImpact": "Impacto no depósito",
+    "source": "Fonte: {source}",
+    "unavailable": "Previsão temporariamente indisponível",
+    "unavailableReason": "Motivo: {error}",
+    "unavailableGeneric": "Não foi possível obter os dados de previsão.",
+    "checkSources": "Consulte as fontes abaixo.",
+    "currentPrices": "Preços Médios Atuais (DGEG)",
+    "calculator": {
+      "title": "Quanto vai custar o meu depósito?",
+      "tankSize": "Tamanho do depósito"
+    },
+    "chart": {
+      "collecting": "Dados em recolha — o gráfico aparece após alguns dias.",
+      "last30": "Últimos 30 dias",
+      "noData": "Sem dados disponíveis. Os dados serão recolhidos diariamente."
+    },
+    "priceBreakdown": {
+      "title": "Como é formado o preço?",
+      "platts": "Cotação internacional (Platts)",
+      "isp": "ISP + Taxa de Carbono",
+      "vat": "IVA (23%)",
+      "biofuels": "Biocombustíveis (13%)",
+      "margin": "Margem + logística",
+      "taxNote": "~55% do preço final são impostos (ISP + IVA)"
+    },
+    "methodology": {
+      "title": "Como funciona a previsão?",
+      "text": "Em Portugal, os preços dos combustíveis atualizam às segundas-feiras. A previsão baseia-se nas cotações internacionais Platts, no câmbio EUR/USD, no preço do Brent, e nos impostos (ISP + IVA a 23%). A ENSE publica diariamente preços de referência. Cada posto define livremente o seu preço final."
+    },
+    "sources": {
+      "title": "Fontes",
+      "contasPoupanca": "Previsões semanais detalhadas",
+      "precoCombustiveis": "Fonte automática da previsão",
+      "ense": "Preços de referência diários",
+      "dgeg": "Preço médio diário oficial"
+    }
+  },
+  "map": {
+    "filters": "Filtros",
+    "locating": "A localizar...",
+    "nearMe": "Perto de mim",
+    "geoNotSupported": "Geolocalização não suportada pelo seu navegador.",
+    "geoFailed": "Não foi possível obter a sua localização. Verifique as permissões.",
+    "stations": "{count} postos",
+    "price": "Preço",
+    "distance": "Distância",
+    "noResults": "Nenhum posto encontrado. Tente alterar os filtros.",
+    "tapNearMe": "Toque em <strong>Perto de mim</strong> para ver os postos mais baratos na sua zona.",
+    "search": "Pesquisar",
+    "fuel": "Combustível",
+    "district": "Distrito",
+    "allDistricts": "Todos os distritos",
+    "brand": "Marca",
+    "allBrands": "Todas as marcas"
+  },
+  "stats": {
+    "title": "Estatísticas de Preços",
+    "subtitle": "Evolução histórica dos preços médios dos combustíveis em Portugal.",
+    "period": "Período",
+    "last30": "Últimos 30 dias",
+    "last90": "Últimos 3 meses",
+    "last180": "Últimos 6 meses",
+    "last365": "Último ano",
+    "fuels": "Combustíveis",
+    "chartTitle": "Evolução de preços - Últimos {days} dias",
+    "emptyTitle": "Dados históricos em construção",
+    "emptyText": "Os dados históricos são recolhidos diariamente de forma automática. Configure o Supabase e aguarde a recolha de dados para ver os gráficos.",
+    "setupTitle": "Para configurar:",
+    "setup1": "1. Crie uma conta no Supabase (gratuito)",
+    "setup2": "2. Execute o SQL de criação de tabelas (ver /sobre)",
+    "setup3": "3. Adicione as variáveis de ambiente no Vercel",
+    "setup4": "4. O cron job recolhe dados automaticamente às 20h",
+    "checkSources": "Enquanto isso, consulte as fontes oficiais:",
+    "dgegLink": "DGEG - Preço Médio Diário",
+    "enseLink": "ENSE - Preços de Referência"
+  },
+  "station": {
+    "prices": "Preços",
+    "noPrices": "Sem preços disponíveis.",
+    "directions": "Direções no Google Maps",
+    "hours": "Horário",
+    "weekdays": "Dias úteis",
+    "saturday": "Sábado",
+    "sunday": "Domingo",
+    "holiday": "Feriado",
+    "payment": "Pagamento",
+    "updated": "Atualizado: {date}",
+    "details": "Detalhes do posto"
+  },
+  "hero": {
+    "fillUp": "Abasteça antes de segunda-feira!",
+    "wait": "Pode esperar — preço vai descer.",
+    "stableAdvice": "Preço estável — abasteça quando quiser."
+  }
+}
