@@ -47,8 +47,15 @@ export async function GET(request: NextRequest) {
     let predictionsSaved = 0;
     try {
       const predData = await scrapePredictions();
-      const weekStart = today;
-      const weekEnd = new Date(new Date(today).getTime() + 6 * 86400000)
+
+      // Compute the next Monday as the stable week_start for this forecast
+      // Predictions scraped during the week refer to the upcoming Monday's price change
+      const now = new Date(today + 'T12:00:00Z');
+      const dayOfWeek = now.getUTCDay(); // 0=Sun, 1=Mon
+      const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
+      const nextMonday = new Date(now.getTime() + daysUntilMonday * 86400000);
+      const weekStart = nextMonday.toISOString().split('T')[0];
+      const weekEnd = new Date(nextMonday.getTime() + 6 * 86400000)
         .toISOString()
         .split('T')[0];
 
