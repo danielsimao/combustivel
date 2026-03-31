@@ -27,9 +27,9 @@ export function StationCard({ station, userLocation, selectedFuel }: StationCard
     : null;
 
   return (
-    <div onClick={() => searchStore.setState((s) => ({ ...s, selectedStation: station }))}>
-      <Card className="cursor-pointer transition-all hover:border-blue-200 hover:shadow-md active:scale-[0.98]">
-        <CardContent className="p-3">
+    <div className="min-w-0" onClick={() => searchStore.setState((s) => ({ ...s, selectedStation: station }))}>
+      <Card className="cursor-pointer overflow-hidden transition-all hover:border-blue-200 hover:shadow-md active:scale-[0.98]">
+        <CardContent className="p-3 [&>*]:min-w-0">
           {/* Top row: price + distance */}
           <div className="flex items-center justify-between gap-2">
             {selectedFuelData && (
