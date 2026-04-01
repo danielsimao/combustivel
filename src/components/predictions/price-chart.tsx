@@ -49,25 +49,26 @@ export function PriceChart({ data, fuelTypes, title, height = 350, predictions, 
     const nextMonday = new Date(now.getTime() + daysUntilMonday * 86400000);
     const nextMondayStr = nextMonday.toISOString().split('T')[0];
 
-    // Get the last real data point
-    const lastPoint = data[data.length - 1];
-
-    // Build the bridge point (last real day with predicted keys to connect the lines)
-    const bridgePoint: ChartData = { date: lastPoint.date };
-    for (const pred of predictions) {
-      const lastValue = lastPoint[pred.fuelType];
-      if (lastValue !== undefined) {
-        bridgePoint[`${pred.fuelType}_predicted`] = lastValue;
+    // Copy data and add _predicted keys to the last real point (bridge)
+    const extendedData = data.map((point, i) => {
+      if (i !== data.length - 1) return point;
+      const bridged = { ...point };
+      for (const pred of predictions) {
+        const lastValue = point[pred.fuelType];
+        if (lastValue !== undefined) {
+          bridged[`${pred.fuelType}_predicted`] = lastValue;
+        }
       }
-    }
+      return bridged;
+    });
 
-    // Build the future predicted point
+    // Add the future predicted point
     const futurePoint: ChartData = { date: nextMondayStr };
     for (const pred of predictions) {
       futurePoint[`${pred.fuelType}_predicted`] = pred.estimatedPrice;
     }
 
-    return [...data, bridgePoint, futurePoint];
+    return [...extendedData, futurePoint];
   }, [data, predictions, todayDate]);
 
   if (!data || data.length === 0) {
