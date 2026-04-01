@@ -147,12 +147,12 @@ export default function PrevisaoPage() {
     // Use the last chart data point as the base price (more reliable than DGEG PMD which is empty on weekends)
     const lastChartPoint = chartData[chartData.length - 1];
 
+    // Always use the last chart point as base — the dashed line starts there,
+    // so the estimated price must be relative to it (not DGEG avg which may differ)
     return predictions
       .filter((p) => CHART_FUELS.includes(p.fuelType))
       .map((p) => {
-        const basePrice = p.currentPriceNum > 0
-          ? p.currentPriceNum
-          : (lastChartPoint[p.fuelType] as number) ?? 0;
+        const basePrice = (lastChartPoint[p.fuelType] as number) ?? 0;
         if (basePrice === 0) return null;
         return {
           fuelType: p.fuelType,

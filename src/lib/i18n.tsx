@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useCallback, ReactNode } from 'react';
 import pt from './translations/pt.json';
 import en from './translations/en.json';
 
@@ -37,11 +37,7 @@ function getNestedValue(obj: Record<string, unknown>, path: string): string | un
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<Locale>('pt');
-
-  useEffect(() => {
-    setLocale(detectLocale());
-  }, []);
+  const locale = detectLocale();
 
   const t = useCallback(
     (key: string, params?: Record<string, string | number>) => {

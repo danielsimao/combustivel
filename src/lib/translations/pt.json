@@ -90,7 +90,7 @@
     "emptyText": "Os dados históricos são recolhidos diariamente de forma automática. Configure o Supabase e aguarde a recolha de dados para ver os gráficos.",
     "setupTitle": "Para configurar:",
     "setup1": "1. Crie uma conta no Supabase (gratuito)",
-    "setup2": "2. Execute o SQL de criação de tabelas (ver /sobre)",
+    "setup2": "2. Execute o SQL de criação de tabelas no Supabase",
     "setup3": "3. Adicione as variáveis de ambiente no Vercel",
     "setup4": "4. O cron job recolhe dados automaticamente às 20h",
     "checkSources": "Enquanto isso, consulte as fontes oficiais:",
