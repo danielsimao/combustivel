@@ -182,22 +182,7 @@ export function PriceChart({ data, fuelTypes, title, height = 350, predictions, 
                 strokeWidth={2.5}
                 strokeDasharray="8 5"
                 strokeOpacity={0.5}
-                dot={(props: Record<string, unknown>) => {
-                  const { cx, cy, index } = props as { cx: number; cy: number; index: number };
-                  // Only show dot on the last (predicted) point, not the bridge
-                  if (index === 0) return <circle key="hidden" r={0} />;
-                  return (
-                    <circle
-                      key="predicted"
-                      cx={cx}
-                      cy={cy}
-                      r={5}
-                      fill={getFuelColor(fuel)}
-                      stroke="white"
-                      strokeWidth={2}
-                    />
-                  );
-                }}
+                dot={false}
                 activeDot={{ r: 6 }}
                 legendType="none"
                 connectNulls
