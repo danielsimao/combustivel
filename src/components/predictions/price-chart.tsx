@@ -130,14 +130,22 @@ export function PriceChart({ data, fuelTypes, title, height = 350, predictions, 
                 return `${parseInt(d)}/${parseInt(m)}`;
               }}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={(value: any, name: any) => {
+              formatter={(value: any, name: any, _props: any, _index: any, payload: any) => {
                 const nameStr = String(name);
-                const isPredicted = nameStr.endsWith('_predicted');
-                const fuelName = isPredicted ? nameStr.replace('_predicted', '') : nameStr;
-                const label = getFuelShortName(fuelName);
+                if (nameStr.endsWith('_predicted')) {
+                  // Only show predicted entry if there's no real value at this point
+                  const fuelName = nameStr.replace('_predicted', '');
+                  const hasRealValue = payload?.some((p: { dataKey: string }) => p.dataKey === fuelName);
+                  if (hasRealValue) return [null, null];
+                  const label = getFuelShortName(fuelName);
+                  return [
+                    `${Number(value).toFixed(3)} €/L`,
+                    `${label} (${t('nav.forecast').toLowerCase()})`,
+                  ];
+                }
                 return [
                   `${Number(value).toFixed(3)} €/L`,
-                  isPredicted ? `${label} (${t('nav.forecast').toLowerCase()})` : label,
+                  getFuelShortName(nameStr),
                 ];
               }}
             />
