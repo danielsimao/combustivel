@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PriceForecast } from '@/components/predictions/price-forecast';
 import { PriceChart } from '@/components/predictions/price-chart';
@@ -141,14 +141,26 @@ export default function PrevisaoPage() {
 
   const hasChartData = chartData.length > 0;
 
-  const chartPredictions = hasPredictions
-    ? predictions
-        .filter((p) => CHART_FUELS.includes(p.fuelType) && p.currentPriceNum > 0)
-        .map((p) => ({
+  const chartPredictions = useMemo(() => {
+    if (!hasPredictions || !hasChartData) return undefined;
+
+    // Use the last chart data point as the base price (more reliable than DGEG PMD which is empty on weekends)
+    const lastChartPoint = chartData[chartData.length - 1];
+
+    return predictions
+      .filter((p) => CHART_FUELS.includes(p.fuelType))
+      .map((p) => {
+        const basePrice = p.currentPriceNum > 0
+          ? p.currentPriceNum
+          : (lastChartPoint[p.fuelType] as number) ?? 0;
+        if (basePrice === 0) return null;
+        return {
           fuelType: p.fuelType,
-          estimatedPrice: p.currentPriceNum + p.predictedChange,
-        }))
-    : undefined;
+          estimatedPrice: basePrice + p.predictedChange,
+        };
+      })
+      .filter(Boolean) as { fuelType: string; estimatedPrice: number }[];
+  }, [hasPredictions, hasChartData, chartData, predictions]);
 
   const todayDate = new Date().toISOString().split('T')[0];
 
