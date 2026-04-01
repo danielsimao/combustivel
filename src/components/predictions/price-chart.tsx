@@ -148,13 +148,14 @@ export function PriceChart({ data, fuelTypes, title, height = 350, predictions, 
               }}
             />
 
-            {/* Today reference line */}
-            {hasPredictions && todayDate && (
+            {/* "Now" reference line — placed at last real data point */}
+            {hasPredictions && data.length > 0 && (
               <ReferenceLine
-                x={todayDate}
+                x={data[data.length - 1].date}
                 stroke="#a1a1aa"
                 strokeDasharray="4 4"
                 strokeWidth={1}
+                label={{ value: '▸', position: 'top', fill: '#a1a1aa', fontSize: 10 }}
               />
             )}
 
@@ -178,11 +179,26 @@ export function PriceChart({ data, fuelTypes, title, height = 350, predictions, 
                 type="monotone"
                 dataKey={`${fuel}_predicted`}
                 stroke={getFuelColor(fuel)}
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                strokeOpacity={0.6}
-                dot={{ r: 4, fill: getFuelColor(fuel), strokeWidth: 0, fillOpacity: 0.6 }}
-                activeDot={{ r: 5 }}
+                strokeWidth={2.5}
+                strokeDasharray="8 5"
+                strokeOpacity={0.5}
+                dot={(props: Record<string, unknown>) => {
+                  const { cx, cy, index } = props as { cx: number; cy: number; index: number };
+                  // Only show dot on the last (predicted) point, not the bridge
+                  if (index === 0) return <circle key="hidden" r={0} />;
+                  return (
+                    <circle
+                      key="predicted"
+                      cx={cx}
+                      cy={cy}
+                      r={5}
+                      fill={getFuelColor(fuel)}
+                      stroke="white"
+                      strokeWidth={2}
+                    />
+                  );
+                }}
+                activeDot={{ r: 6 }}
                 legendType="none"
                 connectNulls
               />
