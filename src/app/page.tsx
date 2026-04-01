@@ -141,6 +141,17 @@ export default function PrevisaoPage() {
 
   const hasChartData = chartData.length > 0;
 
+  const chartPredictions = hasPredictions
+    ? predictions
+        .filter((p) => CHART_FUELS.includes(p.fuelType) && p.currentPriceNum > 0)
+        .map((p) => ({
+          fuelType: p.fuelType,
+          estimatedPrice: p.currentPriceNum + p.predictedChange,
+        }))
+    : undefined;
+
+  const todayDate = new Date().toISOString().split('T')[0];
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
       {/* Page Header */}
@@ -186,6 +197,8 @@ export default function PrevisaoPage() {
                 fuelTypes={CHART_FUELS}
                 title={t('forecast.chart.last30')}
                 height={280}
+                predictions={chartPredictions}
+                todayDate={todayDate}
               />
             </div>
           ) : (

@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -20,15 +21,54 @@ interface ChartData {
   [key: string]: string | number | undefined;
 }
 
+interface PredictionPoint {
+  fuelType: string;
+  estimatedPrice: number;
+}
+
 interface PriceChartProps {
   data: ChartData[];
   fuelTypes: string[];
   title: string;
   height?: number;
+  predictions?: PredictionPoint[];
+  todayDate?: string;
 }
 
-export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartProps) {
+export function PriceChart({ data, fuelTypes, title, height = 350, predictions, todayDate }: PriceChartProps) {
   const { t } = useTranslation();
+
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    if (!predictions || predictions.length === 0) return data;
+
+    // Find next Monday for the predicted point
+    const now = todayDate ? new Date(todayDate + 'T12:00:00Z') : new Date();
+    const dayOfWeek = now.getUTCDay();
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
+    const nextMonday = new Date(now.getTime() + daysUntilMonday * 86400000);
+    const nextMondayStr = nextMonday.toISOString().split('T')[0];
+
+    // Get the last real data point
+    const lastPoint = data[data.length - 1];
+
+    // Build the bridge point (last real day with predicted keys to connect the lines)
+    const bridgePoint: ChartData = { date: lastPoint.date };
+    for (const pred of predictions) {
+      const lastValue = lastPoint[pred.fuelType];
+      if (lastValue !== undefined) {
+        bridgePoint[`${pred.fuelType}_predicted`] = lastValue;
+      }
+    }
+
+    // Build the future predicted point
+    const futurePoint: ChartData = { date: nextMondayStr };
+    for (const pred of predictions) {
+      futurePoint[`${pred.fuelType}_predicted`] = pred.estimatedPrice;
+    }
+
+    return [...data, bridgePoint, futurePoint];
+  }, [data, predictions, todayDate]);
 
   if (!data || data.length === 0) {
     return (
@@ -45,6 +85,8 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
     );
   }
 
+  const hasPredictions = predictions && predictions.length > 0;
+
   return (
     <Card>
       <CardHeader>
@@ -52,7 +94,7 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 20 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
             <XAxis
               dataKey="date"
@@ -82,17 +124,40 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
                 fontSize: '12px',
               }}
               labelStyle={{ color: '#18181b', fontWeight: 600, marginBottom: 4 }}
+              labelFormatter={(v) => {
+                const [, m, d] = String(v).split('-');
+                return `${parseInt(d)}/${parseInt(m)}`;
+              }}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              formatter={(value: any, name: any) => [
-                `${Number(value).toFixed(3)} €/L`,
-                getFuelShortName(String(name)),
-              ]}
+              formatter={(value: any, name: any) => {
+                const nameStr = String(name);
+                const isPredicted = nameStr.endsWith('_predicted');
+                const fuelName = isPredicted ? nameStr.replace('_predicted', '') : nameStr;
+                const label = getFuelShortName(fuelName);
+                return [
+                  `${Number(value).toFixed(3)} €/L`,
+                  isPredicted ? `${label} (${t('nav.forecast').toLowerCase()})` : label,
+                ];
+              }}
             />
             <Legend
-              formatter={(value) => (
-                <span style={{ fontSize: '12px' }}>{getFuelShortName(value)}</span>
-              )}
+              formatter={(value) => {
+                if (String(value).endsWith('_predicted')) return null;
+                return <span style={{ fontSize: '12px' }}>{getFuelShortName(value)}</span>;
+              }}
             />
+
+            {/* Today reference line */}
+            {hasPredictions && todayDate && (
+              <ReferenceLine
+                x={todayDate}
+                stroke="#a1a1aa"
+                strokeDasharray="4 4"
+                strokeWidth={1}
+              />
+            )}
+
+            {/* Solid historical lines */}
             {fuelTypes.map((fuel) => (
               <Line
                 key={fuel}
@@ -102,6 +167,23 @@ export function PriceChart({ data, fuelTypes, title, height = 350 }: PriceChartP
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
+              />
+            ))}
+
+            {/* Dashed predicted lines */}
+            {hasPredictions && fuelTypes.map((fuel) => (
+              <Line
+                key={`${fuel}_predicted`}
+                type="monotone"
+                dataKey={`${fuel}_predicted`}
+                stroke={getFuelColor(fuel)}
+                strokeWidth={2}
+                strokeDasharray="6 4"
+                strokeOpacity={0.6}
+                dot={{ r: 4, fill: getFuelColor(fuel), strokeWidth: 0, fillOpacity: 0.6 }}
+                activeDot={{ r: 5 }}
+                legendType="none"
+                connectNulls
               />
             ))}
           </LineChart>
