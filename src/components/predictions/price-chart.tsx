@@ -93,9 +93,9 @@ export function PriceChart({ data, fuelTypes, title, height = 350, predictions, 
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pl-0 pr-4">
         <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 20 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
             <XAxis
               dataKey="date"
