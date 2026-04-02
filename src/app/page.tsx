@@ -1,102 +1,98 @@
-'use client';
+import { ForecastPage } from '@/components/predictions/forecast-page';
+import { scrapePredictions } from '@/lib/scrape-predictions';
+import { getLatestPredictions, getDailyAverages } from '@/lib/supabase';
+import { getPrecoMedioDiario } from '@/lib/dgeg';
 
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { PriceForecast } from '@/components/predictions/price-forecast';
-import { PriceChart } from '@/components/predictions/price-chart';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  ExternalLink,
-  BarChart3,
-  AlertTriangle,
-  AlertCircle,
-  Calendar,
-  Fuel,
-  ChevronDown,
-} from 'lucide-react';
-import { FuelPrediction } from '@/lib/scrape-predictions';
-import { getDailyAverages } from '@/lib/supabase';
-import { getFuelColor } from '@/lib/utils';
-import { useTranslation } from '@/lib/i18n';
-
-interface PredictionData {
-  predictions: FuelPrediction[];
-  scrapedAt: string;
-  source: string;
-  error?: string;
-}
-
-interface DailyAvg {
-  date: string;
-  fuel_type: string;
-  avg_price: number;
-}
+export const revalidate = 3600; // ISR: revalidate every hour
 
 const CHART_FUELS = ['Gasóleo simples', 'Gasolina simples 95'];
 
+async function fetchPredictionData() {
+  // Try live scrape first, fall back to Supabase
+  try {
+    const data = await scrapePredictions();
+    if (data.predictions.length > 0) {
+      return data;
+    }
+  } catch {
+    // Scrape failed — fall through
+  }
+
+  // Supabase fallback
+  try {
+    const stored = await getLatestPredictions();
+    if (stored.length > 0) {
+      return {
+        predictions: stored.map((p: Record<string, unknown>) => ({
+          fuelType: p.fuel_type as string,
+          fuelLabel: p.fuel_type === 'Gasóleo simples' ? 'Gasóleo Simples'
+            : p.fuel_type === 'Gasolina simples 95' ? 'Gasolina 95'
+            : String(p.fuel_type),
+          week: `${p.week_start} a ${p.week_end}`,
+          trend: (p.direction === 'up' ? 'sobe' : p.direction === 'down' ? 'desce' : 'neutro') as 'sobe' | 'desce' | 'neutro',
+          variation: Math.round(Number(p.predicted_change) * 100),
+          variationEuro: Number(p.predicted_change),
+          text: String(p.recommendation || ''),
+          source: String(p.source || 'precocombustiveis.pt'),
+        })),
+        scrapedAt: String((stored[0] as Record<string, unknown>).created_at || new Date().toISOString()),
+        source: 'supabase',
+      };
+    }
+  } catch {
+    // Supabase failed too
+  }
+
+  return { predictions: [], scrapedAt: '', source: '', error: 'Previsão temporariamente indisponível' };
+}
+
 async function fetchAvgPrices(): Promise<Record<string, number>> {
-  const r = await fetch('/api/dgeg/preco-medio');
-  const data = await r.json();
-  const prices: Record<string, number> = {};
-  if (Array.isArray(data)) {
-    for (const item of data) {
-      if (item.TipoCombustivel && item.PrecoMedio) {
-        prices[item.TipoCombustivel] = parseFloat(
-          String(item.PrecoMedio).replace(',', '.')
-        );
+  try {
+    const data = await getPrecoMedioDiario();
+    const prices: Record<string, number> = {};
+    if (Array.isArray(data)) {
+      for (const item of data) {
+        if (item.TipoCombustivel && item.PrecoMedio) {
+          prices[item.TipoCombustivel] = parseFloat(
+            String(item.PrecoMedio).replace(',', '.')
+          );
+        }
       }
     }
+    return prices;
+  } catch {
+    return {};
   }
-  return prices;
 }
 
-async function fetchPredictions(): Promise<PredictionData> {
-  const r = await fetch('/api/previsao');
-  return r.json();
+async function fetchChartData() {
+  try {
+    const results = await Promise.all(
+      CHART_FUELS.map((fuel) => getDailyAverages(fuel, 30))
+    );
+    const raw = results.flat().filter(Boolean) as { date: string; fuel_type: string; avg_price: number }[];
+
+    const dateMap = new Map<string, { date: string; [key: string]: string | number | undefined }>();
+    for (const item of raw) {
+      if (!dateMap.has(item.date)) {
+        dateMap.set(item.date, { date: item.date });
+      }
+      dateMap.get(item.date)![item.fuel_type] = item.avg_price;
+    }
+    return Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+  } catch {
+    return [];
+  }
 }
 
-async function fetchChartData(): Promise<DailyAvg[]> {
-  const results = await Promise.all(
-    CHART_FUELS.map((fuel) => getDailyAverages(fuel, 30))
-  );
-  return results.flat().filter(Boolean) as DailyAvg[];
-}
+export default async function HomePage() {
+  const [predData, avgPrices, chartData] = await Promise.all([
+    fetchPredictionData(),
+    fetchAvgPrices(),
+    fetchChartData(),
+  ]);
 
-export default function PrevisaoPage() {
-  const [tankSize, setTankSize] = useState(50);
-  const { t, locale } = useTranslation();
-
-  const {
-    data: avgPrices = {},
-    isLoading: pricesLoading,
-  } = useQuery({
-    queryKey: ['avgPrices'],
-    queryFn: fetchAvgPrices,
-  });
-
-  const {
-    data: predData,
-    isLoading: predLoading,
-  } = useQuery({
-    queryKey: ['predictions'],
-    queryFn: fetchPredictions,
-  });
-
-  const {
-    data: chartRaw = [],
-    isLoading: chartLoading,
-  } = useQuery({
-    queryKey: ['priceChart30d'],
-    queryFn: fetchChartData,
-  });
-
-  const loading = pricesLoading || predLoading;
-  const scrapedPredictions = predData?.predictions ?? [];
-  const scrapeError = predData?.error ?? '';
-  const scrapedAt = predData?.scrapedAt ?? '';
-
-  const predictions = scrapedPredictions.map((sp) => {
+  const predictions = predData.predictions.map((sp) => {
     const priceNum = avgPrices[sp.fuelType] ?? 0;
     return {
       fuelType: sp.fuelType,
@@ -107,335 +103,19 @@ export default function PrevisaoPage() {
       currentPriceNum: priceNum,
       predictedChange: sp.variationEuro,
       direction: (sp.trend === 'sobe' ? 'up' : sp.trend === 'desce' ? 'down' : 'stable') as 'up' | 'down' | 'stable',
-      weekRange: sp.week || t('forecast.nextWeek'),
+      weekRange: sp.week || 'Próxima semana',
       recommendation: sp.text,
       source: 'precocombustiveis.pt',
     };
   });
 
-  const hasPredictions = predictions.length > 0;
-
-  const lastUpdated = scrapedAt
-    ? new Date(scrapedAt).toLocaleDateString(locale === 'pt' ? 'pt-PT' : 'en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : null;
-
-  // Build chart data
-  const chartData = (() => {
-    const dateMap = new Map<string, { date: string; [key: string]: string | number | undefined }>();
-    for (const item of chartRaw) {
-      if (!dateMap.has(item.date)) {
-        dateMap.set(item.date, { date: item.date });
-      }
-      dateMap.get(item.date)![item.fuel_type] = item.avg_price;
-    }
-    return Array.from(dateMap.values()).sort((a, b) =>
-      a.date.localeCompare(b.date)
-    );
-  })();
-
-  const hasChartData = chartData.length > 0;
-
-  const chartPredictions = useMemo(() => {
-    if (!hasPredictions || !hasChartData) return undefined;
-
-    // Use the last chart data point as the base price (more reliable than DGEG PMD which is empty on weekends)
-    const lastChartPoint = chartData[chartData.length - 1];
-
-    // Always use the last chart point as base — the dashed line starts there,
-    // so the estimated price must be relative to it (not DGEG avg which may differ)
-    return predictions
-      .filter((p) => CHART_FUELS.includes(p.fuelType))
-      .map((p) => {
-        const basePrice = (lastChartPoint[p.fuelType] as number) ?? 0;
-        if (basePrice === 0) return null;
-        return {
-          fuelType: p.fuelType,
-          estimatedPrice: basePrice + p.predictedChange,
-        };
-      })
-      .filter(Boolean) as { fuelType: string; estimatedPrice: number }[];
-  }, [hasPredictions, hasChartData, chartData, predictions]);
-
-  const todayDate = new Date().toISOString().split('T')[0];
-
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
-      {/* Page Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-white">
-          {t('forecast.title')}
-        </h1>
-        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-zinc-500">
-          {predictions[0]?.weekRange && (
-            <span className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" />
-              {predictions[0].weekRange}
-            </span>
-          )}
-          {lastUpdated && (
-            <span className="text-xs text-zinc-400">
-              {t('forecast.updated', { time: lastUpdated })}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[1, 2].map((i) => (
-              <Skeleton key={i} className="h-72 rounded-xl" />
-            ))}
-          </div>
-        </div>
-      ) : hasPredictions ? (
-        <>
-          {/* Prediction Cards */}
-          <PriceForecast predictions={predictions} lastUpdated={lastUpdated ?? ''} />
-
-          {/* 30-Day Price Chart */}
-          {chartLoading ? (
-            <Skeleton className="mt-6 h-64 rounded-xl" />
-          ) : hasChartData ? (
-            <div className="mt-6">
-              <PriceChart
-                data={chartData}
-                fuelTypes={CHART_FUELS}
-                title={t('forecast.chart.last30')}
-                height={280}
-                predictions={chartPredictions}
-                todayDate={todayDate}
-              />
-            </div>
-          ) : (
-            <Card className="mt-6">
-              <CardContent className="py-8 text-center">
-                <p className="text-sm text-zinc-400">
-                  {t('forecast.chart.collecting')}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Tank Cost Calculator */}
-          {predictions.length > 0 && (
-            <Card className="mt-6">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-2 text-sm font-bold text-zinc-900 dark:text-white">
-                  <Fuel className="h-4 w-4 text-blue-500" />
-                  {t('forecast.calculator.title')}
-                </div>
-
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-zinc-500">{t('forecast.calculator.tankSize')}</span>
-                    <span className="font-bold text-zinc-900 dark:text-white">{tankSize}L</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={10}
-                    max={80}
-                    step={5}
-                    value={tankSize}
-                    onChange={(e) => setTankSize(Number(e.target.value))}
-                    className="mt-2 w-full accent-blue-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-zinc-400">
-                    <span>10L</span>
-                    <span>80L</span>
-                  </div>
-                </div>
-
-                <div className="mt-4 divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {predictions.map((pred) => {
-                    const impact = pred.predictedChange * tankSize;
-                    const isUp = pred.direction === 'up';
-                    const isDown = pred.direction === 'down';
-                    const color = isDown
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : isUp
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-zinc-500';
-
-                    return (
-                      <div key={pred.fuelType} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                        <div className="flex items-center gap-2.5">
-                          <div
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: getFuelColor(pred.fuelType) }}
-                          />
-                          <span className="text-sm text-zinc-700 dark:text-zinc-300">
-                            {pred.fuelLabel}
-                          </span>
-                        </div>
-                        <span className={`text-lg font-black ${color}`}>
-                          {impact > 0 ? '+' : impact < 0 ? '−' : ''}
-                          {Math.abs(impact).toFixed(2).replace('.', ',')} €
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      ) : (
-        /* Fallback */
-        <div className="space-y-6">
-          <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
-            <CardContent className="flex items-start gap-3 p-4">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-              <div>
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                  {t('forecast.unavailable')}
-                </p>
-                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                  {scrapeError
-                    ? t('forecast.unavailableReason', { error: scrapeError })
-                    : t('forecast.unavailableGeneric')}
-                  {' '}{t('forecast.checkSources')}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {Object.keys(avgPrices).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">{t('forecast.currentPrices')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {Object.entries(avgPrices)
-                    .filter(([key]) =>
-                      ['Gasóleo simples', 'Gasolina simples 95'].includes(key)
-                    )
-                    .map(([fuel, price]) => (
-                      <div
-                        key={fuel}
-                        className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 dark:border-zinc-800"
-                      >
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">{fuel}</span>
-                        <span className="text-lg font-bold text-zinc-900 dark:text-white">
-                          {price.toFixed(3).replace('.', ',')} €/L
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* Accordion: Educational content */}
-      <div className="mt-8 space-y-2">
-        <details className="group rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-blue-500" />
-              {t('forecast.priceBreakdown.title')}
-            </div>
-            <ChevronDown className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
-            <div className="space-y-3">
-              {[
-                { label: t('forecast.priceBreakdown.platts'), pct: 35, color: 'bg-blue-500' },
-                { label: t('forecast.priceBreakdown.isp'), pct: 30, color: 'bg-red-500' },
-                { label: t('forecast.priceBreakdown.vat'), pct: 19, color: 'bg-amber-500' },
-                { label: t('forecast.priceBreakdown.biofuels'), pct: 6, color: 'bg-emerald-500' },
-                { label: t('forecast.priceBreakdown.margin'), pct: 10, color: 'bg-zinc-400' },
-              ].map((item) => (
-                <div key={item.label}>
-                  <div className="mb-1 flex justify-between text-xs">
-                    <span className="text-zinc-600 dark:text-zinc-400">{item.label}</span>
-                    <span className="font-medium text-zinc-900 dark:text-white">~{item.pct}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                    <div
-                      className={`h-full rounded-full ${item.color}`}
-                      style={{ width: `${item.pct}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-[10px] text-zinc-400">
-              {t('forecast.priceBreakdown.taxNote')}
-            </p>
-          </div>
-        </details>
-
-        <details className="group rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-zinc-400" />
-              {t('forecast.methodology.title')}
-            </div>
-            <ChevronDown className="h-4 w-4 text-zinc-400 transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
-            <p className="text-xs text-zinc-500">
-              {t('forecast.methodology.text')}
-            </p>
-          </div>
-        </details>
-      </div>
-
-      {/* External sources */}
-      <div className="mt-8">
-        <h2 className="mb-4 text-sm font-bold text-zinc-700 dark:text-zinc-300">
-          {t('forecast.sources.title')}
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[
-            {
-              name: 'Contas Poupança',
-              url: 'https://contaspoupanca.pt/carro/combustiveis/',
-              desc: t('forecast.sources.contasPoupanca'),
-            },
-            {
-              name: 'precoCombustiveis.pt',
-              url: 'https://precocombustiveis.pt/proxima-semana/',
-              desc: t('forecast.sources.precoCombustiveis'),
-            },
-            {
-              name: 'ENSE',
-              url: 'https://www.ense-epe.pt/precos-de-referencia/',
-              desc: t('forecast.sources.ense'),
-            },
-            {
-              name: 'DGEG',
-              url: 'https://precoscombustiveis.dgeg.gov.pt/estatistica/preco-medio-diario/',
-              desc: t('forecast.sources.dgeg'),
-            },
-          ].map((source) => (
-            <a
-              key={source.name}
-              href={source.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-            >
-              <div className="flex-1">
-                <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                  {source.name}
-                </p>
-                <p className="text-xs text-zinc-500">{source.desc}</p>
-              </div>
-              <ExternalLink className="h-4 w-4 shrink-0 text-zinc-400" />
-            </a>
-          ))}
-        </div>
-      </div>
-    </div>
+    <ForecastPage
+      predictions={predictions}
+      chartData={chartData}
+      avgPrices={avgPrices}
+      scrapedAt={predData.scrapedAt || null}
+      scrapeError={predData.error || ''}
+    />
   );
 }
